@@ -20,10 +20,11 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }))
 app.use(express.static("public"))
 
 //routes import
-import whisperRoutes from "./routes/whisper.route.js";
+import speechRoutes from "./routes/speech.route.js";
 
 // routes
-app.use("/api/v1/whisper", whisperRoutes);
+app.use("/api/v1/speech", speechRoutes);
+
 
 
 export { app };

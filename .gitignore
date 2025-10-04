@@ -47,3 +47,6 @@ coverage/
 *.tgz
 *.tar.gz
 *.zip
+
+
+service-account-key.json
