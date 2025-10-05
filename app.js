@@ -21,10 +21,11 @@ app.use(express.static("public"))
 
 //routes import
 import speechRoutes from "./routes/speech.route.js";
+import llmRoutes from "./routes/llm.route.js";
 
 // routes
 app.use("/api/v1/speech", speechRoutes);
-
+app.use("/api/v1/llm", llmRoutes);
 
 
 export { app };
