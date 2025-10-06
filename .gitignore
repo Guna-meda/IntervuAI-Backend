@@ -50,3 +50,7 @@ coverage/
 
 
 service-account-key.json
+service-account-key-*.json
+
+service-account-firebase.json
+service-account-firebase-*.json
