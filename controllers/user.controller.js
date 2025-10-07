@@ -1,7 +1,13 @@
 import { User } from "../models/user.model.js";
+import mongoose from "mongoose";
 
 export const createOrFetchUser = async (req, res) => {
   try {
+    // Check MongoDB connection state
+    if (mongoose.connection.readyState !== 1) {
+      throw new Error("MongoDB is not connected");
+    }
+
     const { uid, email, displayName } = req.body;
     const firebaseUid = req.firebaseUid; // Set by verifyFirebaseToken middleware
 
@@ -27,7 +33,7 @@ export const createOrFetchUser = async (req, res) => {
       });
       console.log("Created new MongoDB user:", user.email, "with displayName:", user.displayName);
     } else {
-      // Optionally update displayName if it has changed
+      // Update displayName if it has changed
       if (user.displayName !== finalDisplayName) {
         user.displayName = finalDisplayName;
         await user.save();
@@ -40,12 +46,23 @@ export const createOrFetchUser = async (req, res) => {
     return res.status(200).json(user);
   } catch (error) {
     console.error("Error in createOrFetchUser:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    if (error.code === 11000) {
+      return res.status(409).json({ error: `Duplicate key error: ${error.keyValue.email || error.keyValue.firebaseUid} already exists` });
+    }
+    if (error.name === "MongooseError" && error.message.includes("buffering timed out")) {
+      return res.status(503).json({ error: "Database connection timeout, please try again later" });
+    }
+    return res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 };
 
 export const getUser = async (req, res) => {
   try {
+    // Check MongoDB connection state
+    if (mongoose.connection.readyState !== 1) {
+      throw new Error("MongoDB is not connected");
+    }
+
     const firebaseUid = req.firebaseUid; // Set by verifyFirebaseToken middleware
     const user = await User.findOne({ firebaseUid });
 
@@ -56,6 +73,9 @@ export const getUser = async (req, res) => {
     return res.status(200).json(user);
   } catch (error) {
     console.error("Error in getUser:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    if (error.name === "MongooseError" && error.message.includes("buffering timed out")) {
+      return res.status(503).json({ error: "Database connection timeout, please try again later" });
+    }
+    return res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 };
