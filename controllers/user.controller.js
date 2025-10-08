@@ -55,7 +55,10 @@ export const setupProfile = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const parsedData = await parseResume(profileData.resumeText);
+      let parsedData;
+    if (profileData.resumeText !== undefined && profileData.resumeText) {
+      parsedData = await parseResume(profileData.resumeText);
+    }
 
 
     // Update profile and mark as setup
@@ -109,8 +112,12 @@ export const updateProfile = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-        const parsedData = await parseResume(resumeText);
 
+    // Update profile fields if provided
+    let parsedData;
+    if (updateData.resumeText !== undefined && updateData.resumeText) {
+      parsedData = await parseResume(updateData.resumeText);
+    }
 
     // Update profile fields if provided
     if (updateData.resumeText !== undefined) {
@@ -118,7 +125,8 @@ export const updateProfile = async (req, res) => {
     }
 
     if (updateData.parsedData !== undefined) {
-      user.profile.parsedData = parsedData;
+      // if parsedData was computed above prefer that, otherwise use provided parsedData
+      user.profile.parsedData = parsedData || updateData.parsedData;
     }
     
     // Update other profile fields if provided
