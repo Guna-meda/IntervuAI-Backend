@@ -1,15 +1,16 @@
+// user.controller.js
 import { User } from "../models/user.model.js";
 import mongoose from "mongoose";
+import { parseResume } from "../utils/parseResume.js";
 
 export const createOrFetchUser = async (req, res) => {
   try {
-    // Check MongoDB connection state
     if (mongoose.connection.readyState !== 1) {
       throw new Error("MongoDB is not connected");
     }
 
     const { uid, email, displayName } = req.body;
-    const firebaseUid = req.firebaseUid; // Set by verifyFirebaseToken middleware
+    const firebaseUid = req.firebaseUid;
 
     if (!uid || !email) {
       return res.status(400).json({ error: "Missing required fields: uid and email" });
@@ -19,10 +20,8 @@ export const createOrFetchUser = async (req, res) => {
       return res.status(403).json({ error: "Unauthorized: UID mismatch" });
     }
 
-    // Use email prefix as displayName if not provided
     const finalDisplayName = displayName || email.split("@")[0] || "User";
 
-    // Find or create user in MongoDB
     let user = await User.findOne({ firebaseUid: uid });
 
     if (!user) {
@@ -30,40 +29,63 @@ export const createOrFetchUser = async (req, res) => {
         firebaseUid: uid,
         email,
         displayName: finalDisplayName,
+        profileSetup: false
       });
-      console.log("Created new MongoDB user:", user.email, "with displayName:", user.displayName);
     } else {
-      // Update displayName if it has changed
       if (user.displayName !== finalDisplayName) {
         user.displayName = finalDisplayName;
         await user.save();
-        console.log("Updated MongoDB user displayName:", user.email, "to:", user.displayName);
-      } else {
-        console.log("Fetched existing MongoDB user:", user.email, "with displayName:", user.displayName);
       }
     }
 
     return res.status(200).json(user);
   } catch (error) {
     console.error("Error in createOrFetchUser:", error);
-    if (error.code === 11000) {
-      return res.status(409).json({ error: `Duplicate key error: ${error.keyValue.email || error.keyValue.firebaseUid} already exists` });
+    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
+};
+
+export const setupProfile = async (req, res) => {
+  try {
+    const firebaseUid = req.firebaseUid;
+    const profileData = req.body;
+
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
-    if (error.name === "MongooseError" && error.message.includes("buffering timed out")) {
-      return res.status(503).json({ error: "Database connection timeout, please try again later" });
-    }
+
+    const parsedData = await parseResume(profileData.resumeText);
+
+
+    // Update profile and mark as setup
+    user.profile = {
+      fullName: profileData.fullName,
+      role: profileData.role,
+      company: profileData.company,
+      joinDate: profileData.joinDate,
+      bio: profileData.bio,
+      linkedin: profileData.linkedin,
+      github: profileData.github,
+      website: profileData.website,
+      skills: profileData.skills,
+      resumeText: profileData.resumeText,
+      parsedData: parsedData
+    };
+    
+    user.profileSetup = true;
+    await user.save();
+
+    return res.status(200).json(user);
+  } catch (error) {
+    console.error("Error in setupProfile:", error);
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 };
 
 export const getUser = async (req, res) => {
   try {
-    // Check MongoDB connection state
-    if (mongoose.connection.readyState !== 1) {
-      throw new Error("MongoDB is not connected");
-    }
-
-    const firebaseUid = req.firebaseUid; // Set by verifyFirebaseToken middleware
+    const firebaseUid = req.firebaseUid;
     const user = await User.findOne({ firebaseUid });
 
     if (!user) {
@@ -73,9 +95,62 @@ export const getUser = async (req, res) => {
     return res.status(200).json(user);
   } catch (error) {
     console.error("Error in getUser:", error);
-    if (error.name === "MongooseError" && error.message.includes("buffering timed out")) {
-      return res.status(503).json({ error: "Database connection timeout, please try again later" });
+    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    const firebaseUid = req.firebaseUid;
+    const updateData = req.body;
+
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
+
+        const parsedData = await parseResume(resumeText);
+
+
+    // Update profile fields if provided
+    if (updateData.resumeText !== undefined) {
+      user.profile.resumeText = updateData.resumeText;
+    }
+
+    if (updateData.parsedData !== undefined) {
+      user.profile.parsedData = parsedData;
+    }
+    
+    // Update other profile fields if provided
+    if (updateData.fullName !== undefined) {
+      user.profile.fullName = updateData.fullName;
+    }
+    if (updateData.role !== undefined) {
+      user.profile.role = updateData.role;
+    }
+    if (updateData.company !== undefined) {
+      user.profile.company = updateData.company;
+    }
+    if (updateData.bio !== undefined) {
+      user.profile.bio = updateData.bio;
+    }
+    if (updateData.skills !== undefined) {
+      user.profile.skills = updateData.skills;
+    }
+    if (updateData.linkedin !== undefined) {
+      user.profile.linkedin = updateData.linkedin;
+    }
+    if (updateData.github !== undefined) {
+      user.profile.github = updateData.github;
+    }
+    if (updateData.website !== undefined) {
+      user.profile.website = updateData.website;
+    }
+
+    await user.save();
+    return res.status(200).json(user);
+  } catch (error) {
+    console.error("Error in updateProfile:", error);
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 };
