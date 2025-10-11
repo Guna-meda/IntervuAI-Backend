@@ -2,57 +2,72 @@ import mongoose  from "mongoose";
 import { Interview } from "../models/interview.model.js";
 import { User } from "../models/user.model.js";
 import { generateOverallInterviewSummary } from "./llm.controller.js";
-
-export const startInterview = async (req , res) => {
-    try {
-        const firebaseUid = req.firebaseUid;
-
-        const user = await User.findOne({firebaseUid})
-        if(!user) {
-            return res.status(404).json({error: "User not found"});
-        }
-
-        const { role, totalRounds } = req.body;
-        if(!role) {
-            return res.status(400).json({error: "Role is required to start an interview"});
-        }
-
-        //rounds
-        let rounds = [];
-        for(let i = 1; i <= (totalRounds || 3); i++) {
-            rounds.push({   
-                roundNumber: i,
-                status: "not_started",
-                questions: [],
-                startedAt: null,
-                completedAt: null
-            });
-        }
+import { v4 as uuidv4 } from 'uuid'; // Ensure UUID is imported
 
 
-         const interview = await Interview.create({
+export const startInterview = async (req, res) => {
+  try {
+    const firebaseUid = req.firebaseUid;
+    console.log('Starting interview for firebaseUid:', firebaseUid);
+
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { role, totalRounds, interviewId } = req.body;
+    if (!role) {
+      return res.status(400).json({ error: 'Role is required to start an interview' });
+    }
+
+    // Generate unique interviewId only if not provided
+    const newInterviewId = interviewId || uuidv4();
+
+    // Check if interviewId already exists (optional, for safety)
+    if (newInterviewId && !interviewId) {
+      const existingInterview = await Interview.findOne({ interviewId: newInterviewId });
+      if (existingInterview) {
+        return res.status(400).json({ error: 'Generated interviewId already exists, please try again' });
+      }
+    }
+
+    // Create rounds
+    let rounds = [];
+    for (let i = 1; i <= (totalRounds || 3); i++) {
+      rounds.push({
+        roundNumber: i,
+        status: 'not_started',
+        questions: [],
+        startedAt: null,
+        completedAt: null
+      });
+    }
+
+    const interview = await Interview.create({
+      interviewId: newInterviewId, // Use provided or generated interviewId
       user: user._id,
       role: role || user.profile.role,
-      totalRounds,
+      totalRounds: totalRounds || 3,
       currentRound: 1,
       rounds,
       progress: 0,
-      status: "active",
+      status: 'active',
       createdAt: new Date(),
       lastActiveAt: new Date()
     });
 
     await interview.populate('user', 'displayName profile');
-   return res.status(201).json({
+    return res.status(201).json({
       interviewId: interview.interviewId,
-      message: "New interview started successfully",
+      message: 'New interview started successfully',
       interview
     });
   } catch (error) {
-    console.error("Error starting interview:", error);
+    console.error('Error starting interview:', error);
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 };
+
 
 export const getActiveInterview = async (req, res) => {
     try {
@@ -336,10 +351,11 @@ export const completeRound = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const interview = await Interview.findOne({ 
-      interviewId, 
-      user: user._id 
-    });
+   const interview = await Interview.findOne({
+  $or: [{ interviewId }, { _id: interviewId }],
+  user: user._id,
+});
+
     
     if (!interview) {
       return res.status(404).json({ error: "Interview not found" });

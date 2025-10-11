@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-   "type": "module",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
@@ -21,7 +21,8 @@
     "mongoose": "^8.19.0",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
-    "openai": "^5.23.2"
+    "openai": "^5.23.2",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
