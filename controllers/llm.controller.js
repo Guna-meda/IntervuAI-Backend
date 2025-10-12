@@ -10,9 +10,8 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// API 1: Generate Prepared Question (New Question)
 export const generatePreparedQuestion = asyncHandler(async (req, res) => {
-  const { interviewId, roundNumber } = req.body;
+  const { interviewId, roundNumber, previousQuestions = [] } = req.body;
   const firebaseUid = req.firebaseUid;
 
   // Validate input
@@ -63,7 +62,9 @@ ${interview.overallSummary ? `Summary: ${interview.overallSummary.substring(0, 2
 CURRENT INTERVIEW CONTEXT:
 - Current Round: ${roundNumber}
 - Total Rounds: ${interview.totalRounds}
-- Questions asked so far in this round: ${interview.rounds[roundNumber - 1]?.questions?.length || 0}
+- Questions asked so far in this round: ${previousQuestions.length}
+- Previous questions in this round:
+${previousQuestions.map(q => `- ${q.question} (Score: ${q.score || 'N/A'})`).join('\n')}
 
 PREVIOUS ROUNDS IN THIS INTERVIEW:
 ${interview.rounds.slice(0, roundNumber - 1).map((round, index) => `
@@ -79,11 +80,19 @@ INSTRUCTIONS:
 5. Focus on ${interview.role}-specific technical concepts
 6. Question should be clear, concise, and answerable in 2-3 minutes
 7. Make it feel like a natural progression in the interview
+8. Tailor to candidate's skills like MERN, Next.js, JS - avoid generic questions, focus on practical scenarios
 
 Generate only the question text without any explanations or prefixes.
 
 QUESTION:
 `;
+
+    // Log prompt preview before calling OpenAI
+    try { 
+      console.log('[LLM] generatePreparedQuestion prompt preview (truncated 1200 chars):', prompt.slice(0, 1200)); 
+    } catch (e) { 
+      console.warn('LLM log preview failed', e); 
+    }
 
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -129,23 +138,43 @@ QUESTION:
       ],
       "Data Scientist": [
         "How would you handle missing values in a dataset and what are the trade-offs of different imputation methods?",
-        "Can you explain the bias-variance tradeoff in machine learning models?",
-        "What metrics would you use to evaluate a classification model and why?"
+        "Can you explain the bias-variance tradeoff in machine learning and how it affects model selection?",
+        "Describe a situation where you would use clustering algorithms and which one you'd choose for high-dimensional data."
+      ],
+      "Product Manager": [
+        "How do you prioritize features in a product roadmap?",
+        "Can you walk me through how you'd conduct user research for a new feature?",
+        "What metrics would you use to measure the success of a mobile app launch?"
+      ],
+      "UX Designer": [
+        "How do you approach creating user personas for a new project?",
+        "Can you explain the difference between wireframes, mockups, and prototypes?",
+        "How would you conduct usability testing for a web application?"
       ],
       "DevOps Engineer": [
-        "How would you design a CI/CD pipeline for a containerized application?",
-        "What are the key differences between Docker and Kubernetes and when would you use each?",
-        "How do you approach monitoring and alerting in a distributed system?"
-      ]
+        "Can you explain the key differences between Docker and Kubernetes?",
+        "How would you set up a CI/CD pipeline for a microservices application?",
+        "What monitoring tools have you used and how do you handle alerting?"
+      ],
+      "Frontend Developer": [
+        "Can you explain how the Virtual DOM works in React?",
+        "What are the differences between CSS Grid and Flexbox?",
+        "How would you optimize a website for performance?"
+      ],
+      "Backend Developer": [
+        "How do you handle database migrations in a production environment?",
+        "What is the difference between REST and GraphQL?",
+        "How would you implement authentication in a Node.js application?"
+      ],
     };
 
-    const roleQuestions = fallbackQuestions[interview?.role] || fallbackQuestions["Software Engineer"];
-    const randomQuestion = roleQuestions[Math.floor(Math.random() * roleQuestions.length)];
-    
+    const roleFallback = fallbackQuestions[interview.role] || fallbackQuestions["Software Engineer"];
+    const fallbackQuestion = roleFallback[Math.floor(Math.random() * roleFallback.length)];
+
     return res
       .status(200)
       .json(new ApiResponse(200, { 
-        question: randomQuestion,
+        question: fallbackQuestion,
         questionType: "prepared",
         roundNumber: roundNumber
       }, "Used fallback prepared question"));
@@ -208,7 +237,10 @@ Generate ONE follow-up question that matches the requested type and feels natura
 FOLLOW-UP QUESTION:
 `;
 
-    const completion = await openai.chat.completions.create({
+  // Log prompt preview before calling OpenAI for follow-up question
+  try { console.log('[LLM] generateFollowUpQuestion prompt preview (truncated 1200 chars):', prompt.slice(0, 1200)); } catch (e) { console.warn('LLM log preview failed', e); }
+
+  const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
@@ -224,7 +256,8 @@ FOLLOW-UP QUESTION:
       temperature: 0.7,
     });
 
-    const followUpQuestion = completion.choices[0]?.message?.content?.trim();
+  const followUpQuestion = completion.choices[0]?.message?.content?.trim();
+  try { console.log('[LLM] generateFollowUpQuestion response preview (truncated 800 chars):', (completion?.choices?.[0]?.message?.content || '').slice(0, 800)); } catch (e) { }
 
     if (!followUpQuestion) {
       throw new ApiError(500, "Failed to generate follow-up question");
@@ -308,7 +341,9 @@ Focus on actionable insights that can guide future interview question selection 
 Provide a structured but concise analysis.
 `;
 
-    const completion = await openai.chat.completions.create({
+  try { console.log('[LLM] generateOverallInterviewSummary prompt preview (truncated 2000 chars):', prompt.slice(0, 2000)); } catch (e) { }
+
+  const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
@@ -324,8 +359,10 @@ Provide a structured but concise analysis.
       temperature: 0.7,
     });
 
-    const summary = completion.choices[0]?.message?.content?.trim();
-    return summary || "Interview analysis completed. Review individual rounds for detailed feedback.";
+  try { console.log('[LLM] generateOverallInterviewSummary response preview (truncated 2000 chars):', (completion?.choices?.[0]?.message?.content || '').slice(0, 2000)); } catch (e) { }
+
+  const summary = completion.choices[0]?.message?.content?.trim();
+  return summary || "Interview analysis completed. Review individual rounds for detailed feedback.";
 
   } catch (error) {
     console.error("Error in generateOverallInterviewSummary:", error);
@@ -376,7 +413,7 @@ CANDIDATE BACKGROUND:
 ANALYSIS REQUIREMENTS:
 1. ACCURACY ASSESSMENT: Evaluate how correct and complete the answer is
 2. ANSWER SUMMARY: Create a concise 1-2 sentence summary of their response
-3. DETAILED FEEDBACK: Provide specific feedback on what was good and what needs improvement
+3. DETAILED FEEDBACK: Provide detailed but concise technical feedback (2-4 sentences max)
 4. FOLLOW-UP DECISION: Determine if a follow-up question is needed based on answer quality
 
 OUTPUT FORMAT (as JSON):
@@ -405,6 +442,8 @@ FOLLOW-UP TYPES:
 Be honest but constructive in your assessment.
 `;
 
+    try { console.log('[LLM] generateAnswerFeedback prompt preview (truncated 1200 chars):', prompt.slice(0, 1200)); } catch (e) {}
+
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
@@ -421,6 +460,8 @@ Be honest but constructive in your assessment.
       temperature: 0.3,
       response_format: { type: "json_object" }
     });
+
+    try { console.log('[LLM] generateAnswerFeedback response preview (truncated 1200 chars):', (completion?.choices?.[0]?.message?.content || '').slice(0, 1200)); } catch (e) {}
 
     const feedbackData = JSON.parse(completion.choices[0]?.message?.content?.trim());
 

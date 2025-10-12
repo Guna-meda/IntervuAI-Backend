@@ -1,9 +1,8 @@
-import mongoose  from "mongoose";
+import mongoose from "mongoose";
 import { Interview } from "../models/interview.model.js";
 import { User } from "../models/user.model.js";
 import { generateOverallInterviewSummary } from "./llm.controller.js";
-import { v4 as uuidv4 } from 'uuid'; // Ensure UUID is imported
-
+import { v4 as uuidv4 } from 'uuid';
 
 export const startInterview = async (req, res) => {
   try {
@@ -44,7 +43,7 @@ export const startInterview = async (req, res) => {
     }
 
     const interview = await Interview.create({
-      interviewId: newInterviewId, // Use provided or generated interviewId
+      interviewId: newInterviewId,
       user: user._id,
       role: role || user.profile.role,
       totalRounds: totalRounds || 3,
@@ -68,34 +67,34 @@ export const startInterview = async (req, res) => {
   }
 };
 
-
 export const getActiveInterview = async (req, res) => {
-    try {
-        const firebaseUid = req.firebaseUid;
+  try {
+    const firebaseUid = req.firebaseUid;
 
-        const user = await User.findOne({firebaseUid})
-        if(!user) {
-            return res.status(404).json({error: "User not found"});
-        }
-
-        const interviewId = req.params.interviewId;
-        if(!interviewId) {
-            return res.status(400).json({error: "Interview ID is required , or interview does not exists."});
-        }
-
-const interview = await Interview.findOne({ 
-      interviewId, 
-      user: user._id 
-    }).populate('user', 'displayName profile');
-        if(!interview) {
-            return res.status(404).json({error: "Interview not found"});
-        }
-
-        return res.status(200).json({interview});
-    } catch (error) {
-        console.error("Error fetching active interview:", error);
-        return res.status(500).json({ error: `Internal server error: ${error.message}` });
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
+
+    const interviewId = req.params.interviewId;
+    if (!interviewId) {
+      return res.status(400).json({ error: "Interview ID is required" });
+    }
+
+    const interview = await Interview.findOne({
+      interviewId,
+      user: user._id
+    }).populate('user', 'displayName profile');
+
+    if (!interview) {
+      return res.status(404).json({ error: "Interview not found" });
+    }
+
+    return res.status(200).json({ interview });
+  } catch (error) {
+    console.error("Error fetching active interview:", error);
+    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
 };
 
 export const getInterviewStats = async (req, res) => {
@@ -107,15 +106,12 @@ export const getInterviewStats = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Get all interviews for the user
     const interviews = await Interview.find({ user: user._id });
 
-    // Calculate stats
     const totalInterviews = interviews.length;
     const completedInterviews = interviews.filter(i => i.status === 'completed').length;
     const activeInterviews = interviews.filter(i => i.status === 'active').length;
-    
-    // Calculate average score from completed interviews
+
     let totalScore = 0;
     let scoredInterviews = 0;
 
@@ -130,7 +126,7 @@ export const getInterviewStats = async (req, res) => {
             }
             return sum;
           }, 0) / completedRounds.length;
-          
+
           totalScore += interviewScore;
           scoredInterviews++;
         }
@@ -140,27 +136,23 @@ export const getInterviewStats = async (req, res) => {
     const averageScore = scoredInterviews > 0 ? Math.round((totalScore / scoredInterviews) * 10) / 10 : 0;
     const completionRate = totalInterviews > 0 ? Math.round((completedInterviews / totalInterviews) * 100) : 0;
 
-    // Calculate recent activity (last 7 days)
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     const recentActivity = interviews.filter(i => new Date(i.createdAt) > oneWeekAgo).length;
 
-    // Calculate total practice time (estimate based on rounds)
     const totalPracticeTime = interviews.reduce((total, interview) => {
       if (interview.rounds) {
-        return total + interview.rounds.filter(round => round.status === 'completed').length * 30; // 30 mins per round estimate
+        return total + interview.rounds.filter(round => round.status === 'completed').length * 30;
       }
       return total;
     }, 0);
 
-    // Get skill distribution from completed interviews
     const skillDistribution = {};
     interviews.forEach(interview => {
       if (interview.status === 'completed' && interview.rounds) {
         interview.rounds.forEach(round => {
           if (round.questions) {
             round.questions.forEach(question => {
-              // Extract skills from question feedback or type
               if (question.feedback) {
                 const skills = ['javascript', 'react', 'node', 'python', 'java', 'sql', 'system design', 'algorithms'];
                 skills.forEach(skill => {
@@ -193,14 +185,12 @@ export const getInterviewStats = async (req, res) => {
     };
 
     return res.status(200).json(stats);
-
   } catch (error) {
     console.error("Error fetching interview stats:", error);
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 };
 
-// Enhanced getAllInterviews to support filtering
 export const getAllInterviews = async (req, res) => {
   try {
     const firebaseUid = req.firebaseUid;
@@ -211,17 +201,14 @@ export const getAllInterviews = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Build query
     let query = { user: user._id };
     if (status) {
       query.status = status;
     }
 
-    // Build sort options
     const sortOptions = {};
     sortOptions[sortBy] = order === 'desc' ? -1 : 1;
 
-    // Build limit
     const limitValue = limit ? parseInt(limit) : null;
 
     let interviewsQuery = Interview.find(query)
@@ -234,11 +221,9 @@ export const getAllInterviews = async (req, res) => {
 
     const interviews = await interviewsQuery;
 
-    // Enhance interviews with calculated fields for frontend
     const enhancedInterviews = interviews.map(interview => {
       const interviewObj = interview.toObject();
-      
-      // Calculate progress percentage
+
       if (interviewObj.rounds && interviewObj.totalRounds) {
         const completedRounds = interviewObj.rounds.filter(round => round.status === 'completed').length;
         interviewObj.progressPercentage = Math.round((completedRounds / interviewObj.totalRounds) * 100);
@@ -246,7 +231,6 @@ export const getAllInterviews = async (req, res) => {
         interviewObj.progressPercentage = 0;
       }
 
-      // Calculate overall score
       interviewObj.overallScore = 0;
       if (interviewObj.status === 'completed' && interviewObj.rounds) {
         const completedRounds = interviewObj.rounds.filter(round => round.status === 'completed');
@@ -262,7 +246,6 @@ export const getAllInterviews = async (req, res) => {
         }
       }
 
-      // Add formatted dates
       interviewObj.formattedCreatedAt = new Date(interviewObj.createdAt).toLocaleDateString();
       interviewObj.formattedLastActive = new Date(interviewObj.lastActiveAt).toLocaleDateString();
 
@@ -275,14 +258,12 @@ export const getAllInterviews = async (req, res) => {
       activeCount: interviews.filter(i => i.status === 'active').length,
       completedCount: interviews.filter(i => i.status === 'completed').length
     });
-
   } catch (error) {
     console.error("Error fetching interviews:", error);
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 };
 
-// Get specific interview with enhanced data
 export const getInterviewDetails = async (req, res) => {
   try {
     const { interviewId } = req.params;
@@ -293,24 +274,20 @@ export const getInterviewDetails = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const interview = await Interview.findOne({ 
-      interviewId, 
-      user: user._id 
+    const interview = await Interview.findOne({
+      interviewId,
+      user: user._id
     }).populate('user', 'displayName profile');
 
     if (!interview) {
       return res.status(404).json({ error: "Interview not found" });
     }
 
-    // Enhance with calculated fields
     const interviewObj = interview.toObject();
-    
-    // Calculate round scores and progress
+
     if (interviewObj.rounds) {
       interviewObj.rounds = interviewObj.rounds.map(round => {
         const roundObj = { ...round };
-        
-        // Calculate round score
         if (round.questions && round.questions.length > 0) {
           const totalScore = round.questions.reduce((sum, q) => sum + (q.score || 0), 0);
           roundObj.averageScore = Math.round((totalScore / round.questions.length) * 10) / 10;
@@ -321,19 +298,16 @@ export const getInterviewDetails = async (req, res) => {
           roundObj.maxScore = 0;
           roundObj.minScore = 0;
         }
-
         return roundObj;
       });
     }
 
-    // Calculate overall progress
     if (interviewObj.rounds && interviewObj.totalRounds) {
       const completedRounds = interviewObj.rounds.filter(round => round.status === 'completed').length;
       interviewObj.progressPercentage = Math.round((completedRounds / interviewObj.totalRounds) * 100);
     }
 
     return res.status(200).json({ interview: interviewObj });
-
   } catch (error) {
     console.error("Error fetching interview details:", error);
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
@@ -351,12 +325,11 @@ export const completeRound = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-   const interview = await Interview.findOne({
-  $or: [{ interviewId }, { _id: interviewId }],
-  user: user._id,
-});
+    const interview = await Interview.findOne({
+      interviewId,
+      user: user._id
+    }).populate('user', 'displayName profile');
 
-    
     if (!interview) {
       return res.status(404).json({ error: "Interview not found" });
     }
@@ -367,7 +340,7 @@ export const completeRound = async (req, res) => {
     }
 
     const roundIndex = roundNumber - 1;
-    
+
     // Update the round with all questions, answers, and feedback
     interview.rounds[roundIndex] = {
       roundNumber,
@@ -379,7 +352,7 @@ export const completeRound = async (req, res) => {
 
     // Update interview progress
     interview.currentRound = roundNumber + 1;
-    const completedRounds = interview.rounds.filter(round => round.status === "completed").length + 1;
+    const completedRounds = interview.rounds.filter(round => round.status === "completed").length;
     interview.progress = Math.round((completedRounds / interview.totalRounds) * 100);
 
     // If all rounds completed, mark interview as completed and generate overall feedback
@@ -388,13 +361,11 @@ export const completeRound = async (req, res) => {
       interview.completedAt = new Date();
       interview.overallFeedback = roundFeedback;
 
-      // Generate overall interview summary and feedback
       try {
         const overallSummary = await generateOverallInterviewSummary(interview);
         interview.overallSummary = overallSummary;
       } catch (error) {
         console.error("Error generating overall summary:", error);
-        // Continue even if summary generation fails
       }
     }
 
@@ -409,7 +380,6 @@ export const completeRound = async (req, res) => {
       nextRound: interview.currentRound,
       interview
     });
-
   } catch (error) {
     console.error("Error completing round:", error);
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
@@ -426,18 +396,17 @@ export const startRound = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const interview = await Interview.findOne({ 
-      interviewId, 
-      user: user._id 
+    const interview = await Interview.findOne({
+      interviewId,
+      user: user._id
     });
-    
+
     if (!interview) {
       return res.status(404).json({ error: "Interview not found" });
     }
 
     const roundIndex = roundNumber - 1;
-    
-    // Initialize round if not exists
+
     if (!interview.rounds[roundIndex]) {
       interview.rounds[roundIndex] = {
         roundNumber: parseInt(roundNumber),
@@ -447,7 +416,6 @@ export const startRound = async (req, res) => {
         completedAt: null
       };
     } else {
-      // Update existing round
       interview.rounds[roundIndex].status = "in_progress";
       interview.rounds[roundIndex].startedAt = new Date();
     }
@@ -459,7 +427,6 @@ export const startRound = async (req, res) => {
       message: `Round ${roundNumber} started`,
       round: interview.rounds[roundIndex]
     });
-
   } catch (error) {
     console.error("Error starting round:", error);
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
@@ -476,11 +443,11 @@ export const cancelInterview = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const interview = await Interview.findOne({ 
-      interviewId, 
-      user: user._id 
+    const interview = await Interview.findOne({
+      interviewId,
+      user: user._id
     });
-    
+
     if (!interview) {
       return res.status(404).json({ error: "Interview not found" });
     }
@@ -497,7 +464,6 @@ export const cancelInterview = async (req, res) => {
         lastActiveAt: interview.lastActiveAt
       }
     });
-
   } catch (error) {
     console.error("Error cancelling interview:", error);
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
