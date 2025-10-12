@@ -6,12 +6,13 @@ const questionSchema = new mongoose.Schema({
   answer: { type: String },
   feedback: { type: String },
   score: { type: Number, default: 0 },
+  expectedAnswer: { type: String }, // Added for storing expected answer
   questionType: { 
     type: String, 
     enum: ["prepared", "followup"],
     required: true 
   },
-  parentQuestionIndex: { type: Number }, // for follow-up questions, index of parent prepared question
+  parentQuestionIndex: { type: Number },
   askedAt: { type: Date, default: Date.now },
   answeredAt: { type: Date }
 }, { _id: false });

@@ -401,7 +401,7 @@ export const generateAnswerFeedback = asyncHandler(async (req, res) => {
     });
 
     const prompt = `
-You are a technical interviewer for a ${interview.role} position. Analyze the candidate's answer and provide comprehensive feedback.
+You are a technical interviewer for a ${interview.role} position. Analyze the candidate's answer and provide comprehensive feedback, including an expected answer.
 
 QUESTION: "${question}"
 CANDIDATE'S ANSWER: "${answer}"
@@ -414,13 +414,15 @@ ANALYSIS REQUIREMENTS:
 1. ACCURACY ASSESSMENT: Evaluate how correct and complete the answer is
 2. ANSWER SUMMARY: Create a concise 1-2 sentence summary of their response
 3. DETAILED FEEDBACK: Provide detailed but concise technical feedback (2-4 sentences max)
-4. FOLLOW-UP DECISION: Determine if a follow-up question is needed based on answer quality
+4. EXPECTED ANSWER: Provide a concise model answer (2-3 sentences) that represents the ideal response
+5. FOLLOW-UP DECISION: Determine if a follow-up question is needed based on answer quality
 
 OUTPUT FORMAT (as JSON):
 {
   "accuracy": "excellent|good|partial|incorrect|idk",
   "summary": "Concise summary of their answer",
   "feedback": "Detailed technical feedback",
+  "expectedAnswer": "Ideal response to the question",
   "needsFollowUp": true|false,
   "followUpType": "deeper|clarification|rephrase|alternative|none"
 }
@@ -456,7 +458,7 @@ Be honest but constructive in your assessment.
           content: prompt
         }
       ],
-      max_tokens: 500,
+      max_tokens: 600, // Increased to accommodate expectedAnswer
       temperature: 0.3,
       response_format: { type: "json_object" }
     });
@@ -477,6 +479,7 @@ Be honest but constructive in your assessment.
         accuracy: feedbackData.accuracy,
         summary: feedbackData.summary,
         feedback: feedbackData.feedback,
+        expectedAnswer: feedbackData.expectedAnswer,
         needsFollowUp: feedbackData.needsFollowUp,
         followUpType: feedbackData.followUpType,
         score: calculateScoreFromAccuracy(feedbackData.accuracy)
@@ -485,13 +488,13 @@ Be honest but constructive in your assessment.
   } catch (error) {
     console.error("OpenAI API error:", error);
     
-    // Fallback feedback
     return res
       .status(200)
       .json(new ApiResponse(200, { 
         accuracy: "partial",
         summary: "Answer provided but needs more detail",
         feedback: "Thank you for your answer. Let's continue with the next question.",
+        expectedAnswer: "A complete and accurate response addressing the core concepts of the question.",
         needsFollowUp: false,
         followUpType: "none",
         score: 5
