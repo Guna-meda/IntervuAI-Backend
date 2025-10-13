@@ -44,12 +44,14 @@ import speechRoutes from "./routes/speech.route.js";
 import llmRoutes from "./routes/llm.route.js";
 import userRoutes from "./routes/user.route.js";
 import interviewRoutes from "./routes/interview.route.js";
+import analyticsRoutes from "./routes/analytics.route.js";
 
 // Routes
 app.use("/api/v1/speech", speechRoutes);
 app.use("/api/v1/llm", llmRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use('/api/v1/interviews', interviewRoutes);
+app.use('/api/v1/analytics', analyticsRoutes);
 
 
 export { app };
