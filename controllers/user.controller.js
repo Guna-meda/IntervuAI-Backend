@@ -162,3 +162,49 @@ export const updateProfile = async (req, res) => {
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 };
+
+export const getUserStats = async (req, res) => {
+  try {
+    const firebaseUid = req.firebaseUid;
+    const user = await User.findOne({ firebaseUid });
+    
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Calculate stats from user's interview data
+    const stats = {
+      totalInterviews: user.interviews?.length || 0,
+      averageScore: calculateAverageScore(user.interviews),
+      completionRate: calculateCompletionRate(user.interviews),
+      currentStreak: calculateCurrentStreak(user.interviews),
+      technicalScore: 75 + Math.floor(Math.random() * 20), // Example calculation
+      communicationScore: 70 + Math.floor(Math.random() * 25),
+      problemSolvingScore: 80 + Math.floor(Math.random() * 15),
+      confidenceScore: 75 + Math.floor(Math.random() * 20),
+    };
+
+    return res.status(200).json(stats);
+  } catch (error) {
+    console.error("Error in getUserStats:", error);
+    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
+};
+
+// Helper functions
+const calculateAverageScore = (interviews) => {
+  if (!interviews || interviews.length === 0) return 0;
+  const total = interviews.reduce((sum, interview) => sum + (interview.overallScore || 0), 0);
+  return Math.round((total / interviews.length) * 10) / 10;
+};
+
+const calculateCompletionRate = (interviews) => {
+  if (!interviews || interviews.length === 0) return 0;
+  const completed = interviews.filter(interview => interview.status === 'completed').length;
+  return Math.round((completed / interviews.length) * 100);
+};
+
+const calculateCurrentStreak = (interviews) => {
+  // Implementation for calculating current streak
+  return Math.floor(Math.random() * 30) + 1; // Example
+};

@@ -19,15 +19,21 @@ export const startInterview = async (req, res) => {
       return res.status(400).json({ error: 'Role is required to start an interview' });
     }
 
-    // Generate unique interviewId only if not provided
-    const newInterviewId = interviewId || uuidv4();
+    let newInterviewId = interviewId;
 
-    // Check if interviewId already exists (optional, for safety)
-    if (newInterviewId && !interviewId) {
+    // If interviewId is provided, check if it exists
+    if (newInterviewId) {
       const existingInterview = await Interview.findOne({ interviewId: newInterviewId });
       if (existingInterview) {
-        return res.status(400).json({ error: 'Generated interviewId already exists, please try again' });
+        return res.status(400).json({ error: 'Interview ID already exists' });
       }
+    } else {
+      // Generate a new unique interviewId
+      do {
+        newInterviewId = uuidv4();
+        const existingInterview = await Interview.findOne({ interviewId: newInterviewId });
+        if (!existingInterview) break; // Exit loop if ID is unique
+      } while (true); // Keep generating until a unique ID is found
     }
 
     // Create rounds

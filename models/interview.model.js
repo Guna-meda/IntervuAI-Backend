@@ -30,12 +30,7 @@ const roundSchema = new mongoose.Schema({
 }, { _id: false });
 
 const interviewSchema = new mongoose.Schema({
-  interviewId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
+  interviewId: { type: String, required: true, unique: true },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
