@@ -48,6 +48,16 @@ const interviewSchema = new mongoose.Schema({
     enum: ["active", "completed", "cancelled"],
     default: "active"
   },
+  difficulty: {
+    type: String,
+    enum: ['Beginner', 'Intermediate', 'Advanced'],
+    default: 'Intermediate',
+  },
+  retakeOf: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Interview',
+    default: null,
+  },
   createdAt: { type: Date, default: Date.now },
   lastActiveAt: { type: Date, default: Date.now },
   completedAt: { type: Date }

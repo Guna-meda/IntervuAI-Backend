@@ -4,11 +4,25 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { Interview } from "../models/interview.model.js";
 import { User } from "../models/user.model.js";
+import pRetry from "p-retry";
 
-// Initialize OpenAI client
+// Initialize OpenAI client with increased timeout
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: 30000,
 });
+
+// Helper function for retrying OpenAI API calls
+const withRetry = async (fn, retries = 3, delay = 1000) => {
+  return pRetry(fn, {
+    retries,
+    factor: 2,
+    minTimeout: delay,
+    onFailedAttempt: (error) => {
+      console.error(`Retry attempt failed: ${error.message}`);
+    },
+  });
+};
 
 export const generatePreparedQuestion = asyncHandler(async (req, res) => {
   const { interviewId, roundNumber, previousQuestions = [] } = req.body;
@@ -44,8 +58,22 @@ export const generatePreparedQuestion = asyncHandler(async (req, res) => {
 
     console.log('Generating prepared question for round:', roundNumber);
 
+    let previousQAndA = '';
+    if (interview.retakeOf) {
+      const previousInterview = await Interview.findById(interview.retakeOf);
+      if (previousInterview) {
+        previousQAndA = `
+PREVIOUS SIMILAR INTERVIEW (TO GENERATE SIMILAR BUT ADJUSTED QUESTIONS):
+${previousInterview.rounds.map((round, index) => `
+Round ${index + 1}:
+${round.questions.map(q => `  - Question: ${q.question}\n    Answer: ${q.answer || 'Not provided'}\n    Score: ${q.score}/10`).join('\n')}
+`).join('\n')}
+`;
+      }
+    }
+
     const prompt = `
-You are a senior ${interview.role} interviewer conducting a technical interview. Generate ONE technical question based on the candidate's profile, role requirements, and past interview performance.
+You are a senior ${interview.role} interviewer conducting a technical interview. Generate ONE technical question based on the candidate's profile, role requirements, past interview performance, and specified difficulty level.
 
 CANDIDATE PROFILE:
 - Role Applied: ${interview.role}
@@ -59,9 +87,12 @@ Interview for ${interview.role} (${interview.completedAt?.toLocaleDateString() |
 ${interview.overallSummary ? `Summary: ${interview.overallSummary.substring(0, 200)}...` : 'No summary available'}
 `).join('\n')}
 
+${previousQAndA}
+
 CURRENT INTERVIEW CONTEXT:
 - Current Round: ${roundNumber}
 - Total Rounds: ${interview.totalRounds}
+- Difficulty Level: ${interview.difficulty || 'Intermediate'}
 - Questions asked so far in this round: ${previousQuestions.length}
 - Previous questions in this round:
 ${previousQuestions.map(q => `- ${q.question} (Score: ${q.score || 'N/A'})`).join('\n')}
@@ -74,13 +105,18 @@ ${round.questions.map(q => `  - ${q.question} (Score: ${q.score}/10)`).join('\n'
 
 INSTRUCTIONS:
 1. Generate ONE technical question appropriate for round ${roundNumber} of ${interview.totalRounds}
-2. Consider the candidate's skill level and past performance
-3. Make it progressively challenging as rounds advance
-4. Avoid repeating questions from previous rounds
-5. Focus on ${interview.role}-specific technical concepts
-6. Question should be clear, concise, and answerable in 2-3 minutes
-7. Make it feel like a natural progression in the interview
-8. Tailor to candidate's skills like MERN, Next.js, JS - avoid generic questions, focus on practical scenarios
+2. If this is a retake (previous Q&A provided), generate similar-themed questions but adjusted for the new difficulty level and avoid exact repeats
+3. Tailor the question to the specified difficulty level: ${interview.difficulty || 'Intermediate'}
+   - Beginner: Focus on basic concepts and fundamental knowledge
+   - Intermediate: Include practical scenarios and moderate complexity
+   - Advanced: Emphasize system design, optimization, and edge cases
+4. Consider the candidate's skill level and past performance
+5. Make it progressively challenging as rounds advance
+6. Avoid repeating questions from previous rounds or the previous similar interview
+7. Focus on ${interview.role}-specific technical concepts
+8. Question should be clear, concise, and answerable in 2-3 minutes
+9. Make it feel like a natural progression in the interview
+10. Tailor to candidate's skills like MERN, Next.js, JS - avoid generic questions, focus on practical scenarios
 
 Generate only the question text without any explanations or prefixes.
 
@@ -94,21 +130,40 @@ QUESTION:
       console.warn('LLM log preview failed', e); 
     }
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: `You are a senior ${interview.role} technical interviewer. You ask insightful, role-specific technical questions that assess both depth and breadth of knowledge. You adapt your questions based on the candidate's experience level and past performance.`
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      max_tokens: 150,
-      temperature: 0.8,
+    const completion = await withRetry(async () => {
+      console.log('Sending OpenAI request with payload:', {
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: `You are a senior ${interview.role} technical interviewer. You ask insightful, role-specific technical questions that assess both depth and breadth of knowledge. You adapt your questions based on the candidate's experience level, past performance, and specified difficulty level.`
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        max_tokens: 150,
+        temperature: 0.8,
+      });
+      return await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: `You are a senior ${interview.role} technical interviewer. You ask insightful, role-specific technical questions that assess both depth and breadth of knowledge. You adapt your questions based on the candidate's experience level, past performance, and specified difficulty level.`
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        max_tokens: 150,
+        temperature: 0.8,
+      });
     });
+
+    console.log('OpenAI response:', completion);
 
     const preparedQuestion = completion.choices[0]?.message?.content?.trim();
 
@@ -127,49 +182,139 @@ QUESTION:
       }, "Prepared question generated successfully"));
 
   } catch (error) {
-    console.error("OpenAI API error:", error);
+    console.error("OpenAI API error:", {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+      cause: error.cause,
+    });
     
-    // Fallback prepared questions based on role
+    // Fallback prepared questions based on role and difficulty
     const fallbackQuestions = {
-      "Software Engineer": [
-        "Can you explain the difference between synchronous and asynchronous programming in JavaScript?",
-        "How would you design a scalable microservices architecture for an e-commerce platform?",
-        "What are the key principles of RESTful API design and why are they important?"
-      ],
-      "Data Scientist": [
-        "How would you handle missing values in a dataset and what are the trade-offs of different imputation methods?",
-        "Can you explain the bias-variance tradeoff in machine learning and how it affects model selection?",
-        "Describe a situation where you would use clustering algorithms and which one you'd choose for high-dimensional data."
-      ],
-      "Product Manager": [
-        "How do you prioritize features in a product roadmap?",
-        "Can you walk me through how you'd conduct user research for a new feature?",
-        "What metrics would you use to measure the success of a mobile app launch?"
-      ],
-      "UX Designer": [
-        "How do you approach creating user personas for a new project?",
-        "Can you explain the difference between wireframes, mockups, and prototypes?",
-        "How would you conduct usability testing for a web application?"
-      ],
-      "DevOps Engineer": [
-        "Can you explain the key differences between Docker and Kubernetes?",
-        "How would you set up a CI/CD pipeline for a microservices application?",
-        "What monitoring tools have you used and how do you handle alerting?"
-      ],
-      "Frontend Developer": [
-        "Can you explain how the Virtual DOM works in React?",
-        "What are the differences between CSS Grid and Flexbox?",
-        "How would you optimize a website for performance?"
-      ],
-      "Backend Developer": [
-        "How do you handle database migrations in a production environment?",
-        "What is the difference between REST and GraphQL?",
-        "How would you implement authentication in a Node.js application?"
-      ],
+      "Software Engineer": {
+        Beginner: [
+          "What is the difference between `let`, `const`, and `var` in JavaScript?",
+          "Explain how a REST API works in simple terms.",
+          "What is the purpose of a package.json file in a Node.js project?"
+        ],
+        Intermediate: [
+          "Can you explain the difference between synchronous and asynchronous programming in JavaScript?",
+          "How would you design a scalable microservices architecture for an e-commerce platform?",
+          "What are the key principles of RESTful API design and why are they important?"
+        ],
+        Advanced: [
+          "How would you optimize a Node.js application for high concurrency?",
+          "Explain the CAP theorem and its implications for distributed systems.",
+          "How would you implement rate limiting in a REST API?"
+        ],
+      },
+      "Data Scientist": {
+        Beginner: [
+          "What is the difference between supervised and unsupervised learning?",
+          "Explain what a p-value represents in statistical testing.",
+          "What is the purpose of data normalization?"
+        ],
+        Intermediate: [
+          "How would you handle missing values in a dataset and what are the trade-offs of different imputation methods?",
+          "Can you explain the bias-variance tradeoff in machine learning and how it affects model selection?",
+          "Describe a situation where you would use clustering algorithms and which one you'd choose."
+        ],
+        Advanced: [
+          "How would you optimize a machine learning model for low-latency inference?",
+          "Explain how you would handle imbalanced datasets in a classification problem.",
+          "What are the trade-offs of using deep learning vs. traditional ML models?"
+        ],
+      },
+      "Product Manager": {
+        Beginner: [
+          "What is a product roadmap and why is it important?",
+          "How do you define a Minimum Viable Product (MVP)?",
+          "What is the difference between a feature and a user story?"
+        ],
+        Intermediate: [
+          "How do you prioritize features in a product roadmap?",
+          "Can you walk me through how you'd conduct user research for a new feature?",
+          "What metrics would you use to measure the success of a mobile app launch?"
+        ],
+        Advanced: [
+          "How would you handle conflicting stakeholder priorities in product development?",
+          "Explain how you would use A/B testing to optimize a product feature.",
+          "How do you align product strategy with company OKRs?"
+        ],
+      },
+      "UX Designer": {
+        Beginner: [
+          "What is the purpose of a user persona in UX design?",
+          "Explain the difference between a wireframe and a prototype.",
+          "What is usability testing and why is it important?"
+        ],
+        Intermediate: [
+          "How do you approach creating user personas for a new project?",
+          "Can you explain the difference between wireframes, mockups, and prototypes?",
+          "How would you conduct usability testing for a web application?"
+        ],
+        Advanced: [
+          "How would you design an accessible UI for users with visual impairments?",
+          "Explain how you would use design systems to streamline UX workflows.",
+          "How do you balance user needs with business goals in UX design?"
+        ],
+      },
+      "DevOps Engineer": {
+        Beginner: [
+          "What is the difference between CI and CD in DevOps?",
+          "Explain what a Docker container is in simple terms.",
+          "What is the purpose of a configuration management tool?"
+        ],
+        Intermediate: [
+          "Can you explain the key differences between Docker and Kubernetes?",
+          "How would you set up a CI/CD pipeline for a microservices application?",
+          "What monitoring tools have you used and how do you handle alerting?"
+        ],
+        Advanced: [
+          "How would you implement zero-downtime deployments in Kubernetes?",
+          "Explain how you would secure a CI/CD pipeline.",
+          "How do you optimize infrastructure costs in a cloud environment?"
+        ],
+      },
+      "Frontend Developer": {
+        Beginner: [
+          "What is the difference between `inline`, `block`, and `inline-block` in CSS?",
+          "Explain what a component is in React.",
+          "What is the purpose of the `useState` hook in React?"
+        ],
+        Intermediate: [
+          "Can you explain how the Virtual DOM works in React?",
+          "What are the differences between CSS Grid and Flexbox?",
+          "How would you optimize a website for performance?"
+        ],
+        Advanced: [
+          "How would you handle state management in a large-scale React application?",
+          "Explain how you would implement lazy loading for a React app.",
+          "What are the trade-offs of using Next.js vs. plain React?"
+        ],
+      },
+      "Backend Developer": {
+        Beginner: [
+          "What is the difference between SQL and NoSQL databases?",
+          "Explain what middleware is in Express.js.",
+          "What is the purpose of environment variables in a Node.js application?"
+        ],
+        Intermediate: [
+          "How do you handle database migrations in a production environment?",
+          "What is the difference between REST and GraphQL?",
+          "How would you implement authentication in a Node.js application?"
+        ],
+        Advanced: [
+          "How would you design a scalable backend for real-time notifications?",
+          "Explain how you would secure a GraphQL API against common attacks.",
+          "What are the trade-offs of using serverless architecture vs. traditional servers?"
+        ],
+      },
     };
 
     const roleFallback = fallbackQuestions[interview.role] || fallbackQuestions["Software Engineer"];
-    const fallbackQuestion = roleFallback[Math.floor(Math.random() * roleFallback.length)];
+    const difficultyFallback = roleFallback[interview.difficulty] || roleFallback["Intermediate"];
+    const fallbackQuestion = difficultyFallback[Math.floor(Math.random() * difficultyFallback.length)];
 
     return res
       .status(200)
@@ -300,7 +445,6 @@ FOLLOW-UP QUESTION:
   }
 });
 
-// Enhanced Overall Interview Summary (already in your code)
 export const generateOverallInterviewSummary = async (interview) => {
   try {
     const user = await User.findById(interview.user).select('profile');
@@ -501,6 +645,8 @@ Be honest but constructive in your assessment.
       }, "Used fallback feedback"));
   }
 });
+
+
 
 // Helper function to calculate score from accuracy
 const calculateScoreFromAccuracy = (accuracy) => {

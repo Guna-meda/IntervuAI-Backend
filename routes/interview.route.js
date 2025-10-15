@@ -2,13 +2,13 @@
 import express from "express";
 import {
   startInterview,
-  getActiveInterview, // Make sure this is imported
   getAllInterviews,
   completeRound,
   startRound,
   cancelInterview,
   getInterviewStats,
-  getInterviewDetails
+  getInterviewDetails,
+  retakeInterview
 } from "../controllers/interview.controller.js";
 import { verifyFirebaseToken } from "../middlewares/auth.middleware.js";
 
@@ -36,5 +36,8 @@ router.post("/:interviewId/complete-round", completeRound);
 
 // Cancel an interview
 router.post("/:interviewId/cancel", cancelInterview);
+
+//retake completed interview with different level
+router.post("/retake", retakeInterview);
 
 export default router;

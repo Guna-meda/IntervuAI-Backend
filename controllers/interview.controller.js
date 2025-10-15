@@ -1,77 +1,94 @@
-import mongoose from "mongoose";
 import { Interview } from "../models/interview.model.js";
 import { User } from "../models/user.model.js";
 import { generateOverallInterviewSummary } from "./llm.controller.js";
 import { v4 as uuidv4 } from 'uuid';
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { ApiError } from "../utils/ApiError.js";
 
-export const startInterview = async (req, res) => {
+
+export const startInterview = asyncHandler(async (req, res) => {
+  const { role, totalRounds = 3, difficulty = "Intermediate", previousInterviewId } = req.body;
+  const firebaseUid = req.firebaseUid;
+
+  console.log('Starting interview for firebaseUid:', firebaseUid);
+
+  // Validate inputs
+  if (!role) {
+    throw new ApiError(400, "Role is required to start an interview");
+  }
+
+  if (!["Beginner", "Intermediate", "Advanced"].includes(difficulty)) {
+    throw new ApiError(400, "Invalid difficulty level. Choose Beginner, Intermediate, or Advanced.");
+  }
+
   try {
-    const firebaseUid = req.firebaseUid;
-    console.log('Starting interview for firebaseUid:', firebaseUid);
-
     const user = await User.findOne({ firebaseUid });
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      throw new ApiError(404, "User not found");
     }
 
-    const { role, totalRounds, interviewId } = req.body;
-    if (!role) {
-      return res.status(400).json({ error: 'Role is required to start an interview' });
-    }
-
-    let newInterviewId = interviewId;
-
-    // If interviewId is provided, check if it exists
-    if (newInterviewId) {
-      const existingInterview = await Interview.findOne({ interviewId: newInterviewId });
-      if (existingInterview) {
-        return res.status(400).json({ error: 'Interview ID already exists' });
+    // Validate previousInterviewId for retakes
+    let retakeOf = null;
+    if (previousInterviewId) {
+      const previousInterview = await Interview.findOne({ 
+        interviewId: previousInterviewId, 
+        user: user._id 
+      });
+      if (!previousInterview) {
+        throw new ApiError(404, "Previous interview not found");
       }
-    } else {
-      // Generate a new unique interviewId
-      do {
-        newInterviewId = uuidv4();
-        const existingInterview = await Interview.findOne({ interviewId: newInterviewId });
-        if (!existingInterview) break; // Exit loop if ID is unique
-      } while (true); // Keep generating until a unique ID is found
+      if (previousInterview.status !== "completed") {
+        throw new ApiError(400, "Previous interview is not completed");
+      }
+      retakeOf = previousInterview._id;
     }
+
+    // Generate unique interviewId
+    let newInterviewId;
+    do {
+      newInterviewId = uuidv4();
+      const existingInterview = await Interview.findOne({ interviewId: newInterviewId });
+      if (!existingInterview) break; // Exit loop if ID is unique
+    } while (true);
 
     // Create rounds
-    let rounds = [];
-    for (let i = 1; i <= (totalRounds || 3); i++) {
-      rounds.push({
-        roundNumber: i,
-        status: 'not_started',
-        questions: [],
-        startedAt: null,
-        completedAt: null
-      });
-    }
+    const rounds = Array.from({ length: totalRounds }, (_, i) => ({
+      roundNumber: i + 1,
+      status: "not_started",
+      questions: [],
+      startedAt: null,
+      completedAt: null,
+    }));
 
+    // Create new interview
     const interview = await Interview.create({
       interviewId: newInterviewId,
       user: user._id,
       role: role || user.profile.role,
-      totalRounds: totalRounds || 3,
+      totalRounds,
+      difficulty,
+      retakeOf,
+      status: "active",
       currentRound: 1,
       rounds,
       progress: 0,
-      status: 'active',
       createdAt: new Date(),
-      lastActiveAt: new Date()
+      lastActiveAt: new Date(),
     });
 
     await interview.populate('user', 'displayName profile');
-    return res.status(201).json({
-      interviewId: interview.interviewId,
-      message: 'New interview started successfully',
-      interview
-    });
+    return res
+      .status(201)
+      .json(new ApiResponse(201, { 
+        interviewId: interview.interviewId,
+        interview 
+      }, "Interview started successfully"));
   } catch (error) {
-    console.error('Error starting interview:', error);
-    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+    console.error("Error starting interview:", error);
+    throw new ApiError(500, `Internal server error: ${error.message}`);
   }
-};
+});
 
 export const getActiveInterview = async (req, res) => {
   try {
@@ -475,3 +492,41 @@ export const cancelInterview = async (req, res) => {
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 };
+
+export const deleteInterview = async (req, res) => {
+  try {
+    const firebaseUid = req.firebaseUid;
+
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const {interviewId} = req.params;
+    if (!interviewId) {
+      return res.status(400).json({ error: "Interview ID is required" });
+    }
+
+    const interview = await Interview.findOneAndDelete({
+      interviewId,
+      user: user._id
+    });
+
+    if (!interview) {
+      return res.status(404).json({ error: "Interview not found" });
+    }
+
+    // Decrement user's interview count
+    try {
+      user.interviewCount = Math.max(0, (user.interviewCount || 1) - 1);
+      await user.save();
+    } catch (error) {
+      console.error("Error updating user's interview count:", error);
+    }
+  } catch (error) {
+    console.error("Error deleting interview:", error);
+    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
+
+  }
+
