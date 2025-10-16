@@ -193,127 +193,127 @@ QUESTION:
     const fallbackQuestions = {
       "Software Engineer": {
         Beginner: [
-          "What is the difference between `let`, `const`, and `var` in JavaScript?",
-          "Explain how a REST API works in simple terms.",
-          "What is the purpose of a package.json file in a Node.js project?"
+          "FQ -What is the difference between `let`, `const`, and `var` in JavaScript?",
+          "FQ -Explain how a REST API works in simple terms.",
+          "FQ -What is the purpose of a package.json file in a Node.js project?"
         ],
         Intermediate: [
-          "Can you explain the difference between synchronous and asynchronous programming in JavaScript?",
-          "How would you design a scalable microservices architecture for an e-commerce platform?",
-          "What are the key principles of RESTful API design and why are they important?"
+          "FQ -Can you explain the difference between synchronous and asynchronous programming in JavaScript?",
+          "FQ -How would you design a scalable microservices architecture for an e-commerce platform?",
+          "FQ -What are the key principles of RESTful API design and why are they important?"
         ],
         Advanced: [
-          "How would you optimize a Node.js application for high concurrency?",
-          "Explain the CAP theorem and its implications for distributed systems.",
-          "How would you implement rate limiting in a REST API?"
+          "FQ -How would you optimize a Node.js application for high concurrency?",
+          "FQ -Explain the CAP theorem and its implications for distributed systems.",
+          "FQ -How would you implement rate limiting in a REST API?"
         ],
       },
       "Data Scientist": {
         Beginner: [
-          "What is the difference between supervised and unsupervised learning?",
-          "Explain what a p-value represents in statistical testing.",
-          "What is the purpose of data normalization?"
+          "FQ -What is the difference between supervised and unsupervised learning?",
+          "FQ -Explain what a p-value represents in statistical testing.",
+          "FQ -What is the purpose of data normalization?"
         ],
         Intermediate: [
-          "How would you handle missing values in a dataset and what are the trade-offs of different imputation methods?",
-          "Can you explain the bias-variance tradeoff in machine learning and how it affects model selection?",
-          "Describe a situation where you would use clustering algorithms and which one you'd choose."
+          "FQ -How would you handle missing values in a dataset and what are the trade-offs of different imputation methods?",
+          "FQ -Can you explain the bias-variance tradeoff in machine learning and how it affects model selection?",
+          "FQ -Describe a situation where you would use clustering algorithms and which one you'd choose."
         ],
         Advanced: [
-          "How would you optimize a machine learning model for low-latency inference?",
-          "Explain how you would handle imbalanced datasets in a classification problem.",
-          "What are the trade-offs of using deep learning vs. traditional ML models?"
+          "FQ -How would you optimize a machine learning model for low-latency inference?",
+          "FQ -Explain how you would handle imbalanced datasets in a classification problem.",
+          "FQ -What are the trade-offs of using deep learning vs. traditional ML models?"
         ],
       },
       "Product Manager": {
         Beginner: [
-          "What is a product roadmap and why is it important?",
-          "How do you define a Minimum Viable Product (MVP)?",
-          "What is the difference between a feature and a user story?"
+          "FQ -What is a product roadmap and why is it important?",
+          "FQ -How do you define a Minimum Viable Product (MVP)?",
+          "FQ -What is the difference between a feature and a user story?"
         ],
         Intermediate: [
-          "How do you prioritize features in a product roadmap?",
-          "Can you walk me through how you'd conduct user research for a new feature?",
-          "What metrics would you use to measure the success of a mobile app launch?"
+          "FQ -How do you prioritize features in a product roadmap?",
+          "FQ -Can you walk me through how you'd conduct user research for a new feature?",
+          "FQ -What metrics would you use to measure the success of a mobile app launch?"
         ],
         Advanced: [
-          "How would you handle conflicting stakeholder priorities in product development?",
-          "Explain how you would use A/B testing to optimize a product feature.",
-          "How do you align product strategy with company OKRs?"
+          "FQ -How would you handle conflicting stakeholder priorities in product development?",
+          "FQ -Explain how you would use A/B testing to optimize a product feature.",
+          "FQ -How do you align product strategy with company OKRs?"
         ],
       },
       "UX Designer": {
         Beginner: [
-          "What is the purpose of a user persona in UX design?",
-          "Explain the difference between a wireframe and a prototype.",
-          "What is usability testing and why is it important?"
+          "FQ -What is the purpose of a user persona in UX design?",
+          "FQ -Explain the difference between a wireframe and a prototype.",
+          "FQ -What is usability testing and why is it important?"
         ],
         Intermediate: [
-          "How do you approach creating user personas for a new project?",
-          "Can you explain the difference between wireframes, mockups, and prototypes?",
-          "How would you conduct usability testing for a web application?"
+          "FQ -How do you approach creating user personas for a new project?",
+          "FQ -Can you explain the difference between wireframes, mockups, and prototypes?",
+          "FQ -How would you conduct usability testing for a web application?"
         ],
         Advanced: [
-          "How would you design an accessible UI for users with visual impairments?",
-          "Explain how you would use design systems to streamline UX workflows.",
-          "How do you balance user needs with business goals in UX design?"
+          "FQ -How would you design an accessible UI for users with visual impairments?",
+          "FQ -Explain how you would use design systems to streamline UX workflows.",
+          "FQ -How do you balance user needs with business goals in UX design?"
         ],
       },
       "DevOps Engineer": {
         Beginner: [
-          "What is the difference between CI and CD in DevOps?",
-          "Explain what a Docker container is in simple terms.",
-          "What is the purpose of a configuration management tool?"
+          "FQ -What is the difference between CI and CD in DevOps?",
+          "FQ -Explain what a Docker container is in simple terms.",
+          "FQ -What is the purpose of a configuration management tool?"
         ],
         Intermediate: [
-          "Can you explain the key differences between Docker and Kubernetes?",
-          "How would you set up a CI/CD pipeline for a microservices application?",
-          "What monitoring tools have you used and how do you handle alerting?"
+          "FQ -Can you explain the key differences between Docker and Kubernetes?",
+          "FQ -How would you set up a CI/CD pipeline for a microservices application?",
+          "FQ -What monitoring tools have you used and how do you handle alerting?"
         ],
         Advanced: [
-          "How would you implement zero-downtime deployments in Kubernetes?",
-          "Explain how you would secure a CI/CD pipeline.",
-          "How do you optimize infrastructure costs in a cloud environment?"
+          "FQ -How would you implement zero-downtime deployments in Kubernetes?",
+          "FQ -Explain how you would secure a CI/CD pipeline.",
+          "FQ -How do you optimize infrastructure costs in a cloud environment?"
         ],
       },
       "Frontend Developer": {
         Beginner: [
-          "What is the difference between `inline`, `block`, and `inline-block` in CSS?",
-          "Explain what a component is in React.",
-          "What is the purpose of the `useState` hook in React?"
+          "FQ -What is the difference between `inline`, `block`, and `inline-block` in CSS?",
+          "FQ -Explain what a component is in React.",
+          "FQ -What is the purpose of the `useState` hook in React?"
         ],
         Intermediate: [
-          "Can you explain how the Virtual DOM works in React?",
-          "What are the differences between CSS Grid and Flexbox?",
-          "How would you optimize a website for performance?"
+          "FQ -Can you explain how the Virtual DOM works in React?",
+          "FQ -What are the differences between CSS Grid and Flexbox?",
+          "FQ -How would you optimize a website for performance?"
         ],
         Advanced: [
-          "How would you handle state management in a large-scale React application?",
-          "Explain how you would implement lazy loading for a React app.",
-          "What are the trade-offs of using Next.js vs. plain React?"
+          "FQ -How would you handle state management in a large-scale React application?",
+          "FQ -Explain how you would implement lazy loading for a React app.",
+          "FQ -What are the trade-offs of using Next.js vs. plain React?"
         ],
       },
       "Backend Developer": {
         Beginner: [
-          "What is the difference between SQL and NoSQL databases?",
-          "Explain what middleware is in Express.js.",
-          "What is the purpose of environment variables in a Node.js application?"
+          "FQ -What is the difference between SQL and NoSQL databases?",
+          "FQ -Explain what middleware is in Express.js.",
+          "FQ -What is the purpose of environment variables in a Node.js application?"
         ],
         Intermediate: [
-          "How do you handle database migrations in a production environment?",
-          "What is the difference between REST and GraphQL?",
-          "How would you implement authentication in a Node.js application?"
+          "FQ -How do you handle database migrations in a production environment?",
+          "FQ -What is the difference between REST and GraphQL?",
+          "FQ -How would you implement authentication in a Node.js application?"
         ],
         Advanced: [
-          "How would you design a scalable backend for real-time notifications?",
-          "Explain how you would secure a GraphQL API against common attacks.",
-          "What are the trade-offs of using serverless architecture vs. traditional servers?"
+          "FQ -How would you design a scalable backend for real-time notifications?",
+          "FQ -Explain how you would secure a GraphQL API against common attacks.",
+          "FQ -What are the trade-offs of using serverless architecture vs. traditional servers?"
         ],
       },
     };
 
-    const roleFallback = fallbackQuestions[interview.role] || fallbackQuestions["Software Engineer"];
-    const difficultyFallback = roleFallback[interview.difficulty] || roleFallback["Intermediate"];
+    const roleFallback = fallbackQuestions[Interview.role] || fallbackQuestions["Software Engineer"];
+    const difficultyFallback = roleFallback[Interview.difficulty] || roleFallback["Intermediate"];
     const fallbackQuestion = difficultyFallback[Math.floor(Math.random() * difficultyFallback.length)];
 
     return res

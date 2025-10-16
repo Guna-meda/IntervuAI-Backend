@@ -217,7 +217,7 @@ export const getInterviewStats = async (req, res) => {
 export const getAllInterviews = async (req, res) => {
   try {
     const firebaseUid = req.firebaseUid;
-    const { status, limit, sortBy = 'createdAt', order = 'desc' } = req.query;
+    const { status, limit = 10, page = 1, sortBy = 'createdAt', order = 'desc' } = req.query;
 
     const user = await User.findOne({ firebaseUid });
     if (!user) {
@@ -232,17 +232,17 @@ export const getAllInterviews = async (req, res) => {
     const sortOptions = {};
     sortOptions[sortBy] = order === 'desc' ? -1 : 1;
 
-    const limitValue = limit ? parseInt(limit) : null;
+    const limitValue = parseInt(limit) || 10;
+    const skip = (parseInt(page) - 1) * limitValue;
 
-    let interviewsQuery = Interview.find(query)
-      .populate('user', 'displayName profile')
-      .sort(sortOptions);
-
-    if (limitValue) {
-      interviewsQuery = interviewsQuery.limit(limitValue);
-    }
-
-    const interviews = await interviewsQuery;
+    const [interviews, totalCount] = await Promise.all([
+      Interview.find(query)
+        .populate('user', 'displayName profile')
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limitValue),
+      Interview.countDocuments(query)
+    ]);
 
     const enhancedInterviews = interviews.map(interview => {
       const interviewObj = interview.toObject();
@@ -275,18 +275,22 @@ export const getAllInterviews = async (req, res) => {
       return interviewObj;
     });
 
+    const activeCount = enhancedInterviews.filter(i => i.status === 'active').length;
+    const completedCount = enhancedInterviews.filter(i => i.status === 'completed').length;
+
     return res.status(200).json({
       interviews: enhancedInterviews,
-      totalCount: interviews.length,
-      activeCount: interviews.filter(i => i.status === 'active').length,
-      completedCount: interviews.filter(i => i.status === 'completed').length
+      totalCount,
+      activeCount,
+      completedCount,
+      page: parseInt(page),
+      limit: limitValue
     });
   } catch (error) {
     console.error("Error fetching interviews:", error);
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 };
-
 export const getInterviewDetails = async (req, res) => {
   try {
     const { interviewId } = req.params;
@@ -502,7 +506,7 @@ export const deleteInterview = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const {interviewId} = req.params;
+    const { interviewId } = req.params;
     if (!interviewId) {
       return res.status(400).json({ error: "Interview ID is required" });
     }
@@ -523,10 +527,10 @@ export const deleteInterview = async (req, res) => {
     } catch (error) {
       console.error("Error updating user's interview count:", error);
     }
+
+    return res.status(200).json({ message: "Interview deleted successfully" });
   } catch (error) {
     console.error("Error deleting interview:", error);
     return res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
-
-  }
-
+};

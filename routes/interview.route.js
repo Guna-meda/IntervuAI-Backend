@@ -8,7 +8,7 @@ import {
   cancelInterview,
   getInterviewStats,
   getInterviewDetails,
-  retakeInterview
+  deleteInterview,
 } from "../controllers/interview.controller.js";
 import { verifyFirebaseToken } from "../middlewares/auth.middleware.js";
 
@@ -37,7 +37,6 @@ router.post("/:interviewId/complete-round", completeRound);
 // Cancel an interview
 router.post("/:interviewId/cancel", cancelInterview);
 
-//retake completed interview with different level
-router.post("/retake", retakeInterview);
-
+//delete interview
+router.delete("/:interviewId", deleteInterview); 
 export default router;

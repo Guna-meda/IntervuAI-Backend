@@ -49,8 +49,16 @@ const userSchema = new mongoose.Schema(
         education: String,
         summary: String
       },
-      coverImage: String,
-      avatar: String
+      coverImage: {
+        url: String,
+        fileName: String,
+        uploadedAt: Date
+      },
+      avatar: {
+        url: String,
+        fileName: String,
+        uploadedAt: Date
+      }
     },
     stats: {
       interviews: { type: Number, default: 0 },
