@@ -455,58 +455,88 @@ export const generateOverallInterviewSummary = async (interview) => {
       questions: round.questions.map(q => ({
         question: q.question,
         answer: q.answer,
+        answerSummary: q.answerSummary, // Use the summary instead of full answer
         feedback: q.feedback,
         score: q.score,
+        expectedAnswer: q.expectedAnswer,
+        keywords: q.keywords,
         type: q.questionType
       }))
     }));
 
     const prompt = `
-You are analyzing a complete technical interview for a ${interview.role} position. Provide a comprehensive assessment that will help improve future interview questions and candidate evaluation.
+You are analyzing a complete technical interview for a ${interview.role} position. Provide a well-structured, organized summary.
 
-CANDIDATE BACKGROUND:
-- Role: ${interview.role}
-- Experience: ${userProfile.parsedData?.experience || 'Not specified'}
-- Key Skills: ${userProfile.skills?.join(', ') || userProfile.parsedData?.skills?.join(', ') || 'Not specified'}
-
-INTERVIEW PERFORMANCE DATA:
+INTERVIEW DATA:
 ${JSON.stringify(allRoundsData, null, 2)}
 
-ANALYSIS REQUESTED:
-1. TECHNICAL STRENGTHS: Identify 3-5 areas where candidate demonstrated strong proficiency
-2. SKILL GAPS: Identify 3-5 technical areas needing improvement
-3. PROBLEM-SOLVING APPROACH: Assess their methodology and creativity
-4. COMMUNICATION EFFECTIVENESS: Evaluate clarity, depth, and technical articulation
-5. ROLE SUITABILITY: Overall fit for ${interview.role} position
-6. RECOMMENDATIONS FOR FUTURE INTERVIEWS: Specific areas to probe deeper in next interviews
+CREATE A STRUCTURED SUMMARY WITH THESE SECTIONS:
 
-Focus on actionable insights that can guide future interview question selection and difficulty adjustment.
+STRENGTHS (3-4 bullet points):
+- List key areas where candidate performed well
+- Be specific about technical competencies
+- Mention communication and problem-solving strengths
 
-Provide a structured but concise analysis.
+AREAS FOR IMPROVEMENT (3-4 bullet points):
+- Identify specific technical gaps
+- Suggest practical areas to focus on
+- Be constructive and actionable
+
+KEY RECOMMENDATIONS (3-4 bullet points):
+- Provide concrete next steps for learning
+- Suggest specific topics to study
+- Include practice recommendations
+
+OVERALL ASSESSMENT:
+- Brief summary of performance
+- Suitability for the role level
+- Main takeaways
+
+FORMAT REQUIREMENTS:
+- Use clear, concise bullet points
+- Avoid markdown formatting
+- Keep language professional but easy to understand
+- Focus on actionable insights
+- Limit each section to 4 bullet points maximum
+
+OUTPUT FORMAT:
+Strengths:
+• Point 1
+• Point 2
+• Point 3
+
+Areas for Improvement:
+• Point 1  
+• Point 2
+• Point 3
+
+Recommendations:
+• Point 1
+• Point 2
+• Point 3
+
+Overall Assessment:
+Brief summary here...
 `;
 
-  try { console.log('[LLM] generateOverallInterviewSummary prompt preview (truncated 2000 chars):', prompt.slice(0, 2000)); } catch (e) { }
-
-  const completion = await openai.chat.completions.create({
+    const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: "You are a senior technical hiring manager with expertise in software engineering roles. You provide detailed, actionable feedback that helps optimize interview processes and candidate assessment."
+          content: "You are a senior technical hiring manager. You provide clear, structured feedback that is easy to read and actionable. You avoid AI-sounding language and focus on practical insights."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      max_tokens: 1500,
+      max_tokens: 1200,
       temperature: 0.7,
     });
 
-  try { console.log('[LLM] generateOverallInterviewSummary response preview (truncated 2000 chars):', (completion?.choices?.[0]?.message?.content || '').slice(0, 2000)); } catch (e) { }
-
-  const summary = completion.choices[0]?.message?.content?.trim();
-  return summary || "Interview analysis completed. Review individual rounds for detailed feedback.";
+    const summary = completion.choices[0]?.message?.content?.trim();
+    return summary || "Interview analysis completed. Review individual rounds for detailed feedback.";
 
   } catch (error) {
     console.error("Error in generateOverallInterviewSummary:", error);
@@ -537,77 +567,67 @@ export const generateAnswerFeedback = asyncHandler(async (req, res) => {
       throw new ApiError(404, "Interview not found");
     }
 
-    const userProfile = user.profile || {};
-
-    console.log('Generating feedback for answer:', {
-      question: question.substring(0, 100) + '...',
-      answer: answer.substring(0, 100) + '...'
-    });
-
     const prompt = `
-You are a technical interviewer for a ${interview.role} position. Analyze the candidate's answer and provide comprehensive feedback, including an expected answer.
+You are a technical interviewer for a ${interview.role} position. Analyze the candidate's answer and provide comprehensive feedback.
 
 QUESTION: "${question}"
 CANDIDATE'S ANSWER: "${answer}"
 
-CANDIDATE BACKGROUND:
-- Role: ${interview.role}
-- Skills: ${userProfile.skills?.join(', ') || userProfile.parsedData?.skills?.join(', ') || 'Not specified'}
-
-ANALYSIS REQUIREMENTS:
-1. ACCURACY ASSESSMENT: Evaluate how correct and complete the answer is
-2. ANSWER SUMMARY: Create a concise 1-2 sentence summary of their response
-3. DETAILED FEEDBACK: Provide detailed but concise technical feedback (2-4 sentences max)
-4. EXPECTED ANSWER: Provide a concise model answer (2-3 sentences) that represents the ideal response
-5. FOLLOW-UP DECISION: Determine if a follow-up question is needed based on answer quality
+REQUIREMENTS:
+1. ANSWER SUMMARY: Create a concise 1-2 sentence summary of their response (for report display)
+2. DETAILED FEEDBACK: Provide constructive technical feedback (2-3 sentences)
+3. EXPECTED ANSWER: Provide a clear, simple expected answer that a human can easily understand. Use plain English, avoid complex jargon.
+4. KEYWORDS: Extract 4-6 most important technical keywords/concepts from the expected answer
+5. SCORE ASSESSMENT: Evaluate accuracy and provide score
 
 OUTPUT FORMAT (as JSON):
 {
   "accuracy": "excellent|good|partial|incorrect|idk",
-  "summary": "Concise summary of their answer",
+  "answerSummary": "Brief summary of candidate's answer for report",
   "feedback": "Detailed technical feedback",
-  "expectedAnswer": "Ideal response to the question",
+  "expectedAnswer": "Clear, simple expected answer in plain English",
+  "keywords": ["keyword1", "keyword2", "keyword3", "keyword4"],
   "needsFollowUp": true|false,
   "followUpType": "deeper|clarification|rephrase|alternative|none"
 }
 
-ACCURACY LEVELS:
-- "excellent": Comprehensive, correct, and detailed answer
-- "good": Mostly correct with minor gaps
-- "partial": Partially correct but significant gaps
-- "incorrect": Mostly wrong or irrelevant
-- "idk": Candidate explicitly says they don't know
+IMPORTANT FOR EXPECTED ANSWER:
+- Use simple, clear language
+- Avoid complex technical jargon
+- Make it easy to understand and remember
+- Focus on core concepts
+- Keep it practical and actionable
 
-FOLLOW-UP TYPES:
-- "deeper": Ask deeper technical questions (for excellent/good answers)
-- "clarification": Ask for clarification (for partial answers)
-- "rephrase": Ask same question differently (for partial/incorrect)
-- "alternative": Ask about alternative approaches (for good/partial)
-- "none": No follow-up needed (for incorrect/idk)
+KEYWORDS REQUIREMENTS:
+- 4-6 most important technical concepts
+- Relevant to the question and answer
+- Useful for quick revision
+- Specific and meaningful
 
-Be honest but constructive in your assessment.
+EXAMPLE:
+Question: "What is React?"
+Expected Answer: "React is a JavaScript library for building user interfaces. It lets you create reusable components and efficiently update the UI when data changes."
+Keywords: ["components", "virtual dom", "jsx", "state", "props"]
+
+Generate honest but helpful feedback.
 `;
-
-    try { console.log('[LLM] generateAnswerFeedback prompt preview (truncated 1200 chars):', prompt.slice(0, 1200)); } catch (e) {}
 
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: `You are a senior ${interview.role} technical interviewer. You provide honest, constructive feedback that helps candidates improve. You're fair but rigorous in your assessment.`
+          content: `You are a senior ${interview.role} technical interviewer. You provide clear, constructive feedback that helps candidates learn. You explain complex concepts in simple terms.`
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      max_tokens: 600, // Increased to accommodate expectedAnswer
+      max_tokens: 800,
       temperature: 0.3,
       response_format: { type: "json_object" }
     });
-
-    try { console.log('[LLM] generateAnswerFeedback response preview (truncated 1200 chars):', (completion?.choices?.[0]?.message?.content || '').slice(0, 1200)); } catch (e) {}
 
     const feedbackData = JSON.parse(completion.choices[0]?.message?.content?.trim());
 
@@ -615,15 +635,14 @@ Be honest but constructive in your assessment.
       throw new ApiError(500, "Failed to generate feedback");
     }
 
-    console.log('Generated feedback:', feedbackData);
-
     return res
       .status(200)
       .json(new ApiResponse(200, { 
         accuracy: feedbackData.accuracy,
-        summary: feedbackData.summary,
+        answerSummary: feedbackData.answerSummary, // This is the summary for report
         feedback: feedbackData.feedback,
         expectedAnswer: feedbackData.expectedAnswer,
+        keywords: feedbackData.keywords || [], // Keywords for quick revision
         needsFollowUp: feedbackData.needsFollowUp,
         followUpType: feedbackData.followUpType,
         score: calculateScoreFromAccuracy(feedbackData.accuracy)
@@ -632,13 +651,15 @@ Be honest but constructive in your assessment.
   } catch (error) {
     console.error("OpenAI API error:", error);
     
+    // Enhanced fallback with keywords
     return res
       .status(200)
       .json(new ApiResponse(200, { 
         accuracy: "partial",
-        summary: "Answer provided but needs more detail",
-        feedback: "Thank you for your answer. Let's continue with the next question.",
-        expectedAnswer: "A complete and accurate response addressing the core concepts of the question.",
+        answerSummary: "Provided basic answer but needs more depth",
+        feedback: "Thank you for your response. Let's continue with the next question.",
+        expectedAnswer: "A complete response covering the main concepts clearly explained.",
+        keywords: ["concepts", "fundamentals", "basics"],
         needsFollowUp: false,
         followUpType: "none",
         score: 5

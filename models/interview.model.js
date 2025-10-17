@@ -3,10 +3,12 @@ import mongoose from "mongoose";
 
 const questionSchema = new mongoose.Schema({
   question: { type: String, required: true },
-  answer: { type: String },
+  answer: { type: String }, // Full transcript
+  answerSummary: { type: String }, // Summary for report display
   feedback: { type: String },
   score: { type: Number, default: 0 },
-  expectedAnswer: { type: String }, // Added for storing expected answer
+  expectedAnswer: { type: String },
+  keywords: [{ type: String }], // Array of keywords for quick revision
   questionType: { 
     type: String, 
     enum: ["prepared", "followup"],

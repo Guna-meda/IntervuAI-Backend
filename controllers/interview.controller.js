@@ -368,21 +368,26 @@ export const completeRound = async (req, res) => {
 
     const roundIndex = roundNumber - 1;
 
-    // Update the round with all questions, answers, and feedback
+    // Update the round with all questions including new fields
     interview.rounds[roundIndex] = {
       roundNumber,
       status: "completed",
-      questions: questions,
+      questions: questions.map(q => ({
+        ...q,
+        // Ensure all new fields are preserved
+        answerSummary: q.answerSummary,
+        keywords: q.keywords,
+        expectedAnswer: q.expectedAnswer
+      })),
       startedAt: interview.rounds[roundIndex]?.startedAt || new Date(),
       completedAt: new Date()
     };
 
-    // Update interview progress
+    // Rest of the function remains same...
     interview.currentRound = roundNumber + 1;
     const completedRounds = interview.rounds.filter(round => round.status === "completed").length;
     interview.progress = Math.round((completedRounds / interview.totalRounds) * 100);
 
-    // If all rounds completed, mark interview as completed and generate overall feedback
     if (roundNumber === interview.totalRounds) {
       interview.status = "completed";
       interview.completedAt = new Date();
