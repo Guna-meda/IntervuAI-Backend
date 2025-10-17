@@ -1,4 +1,3 @@
-import { Analytics } from "../models/analytics.model.js";
 import { Interview } from "../models/interview.model.js";
 import { User } from "../models/user.model.js";
 
@@ -43,13 +42,13 @@ export const getAnalytics = async (req, res) => {
       : 0;
 
     // Calculate REAL skill breakdown from questions
-    const skillBreakdown = calculateRealSkillBreakdown(interviews);
+    const skillBreakdown = calculateRealSkillBreakdownFromInterviews(interviews);
     
     // Calculate REAL weekly progress
-    const weeklyProgress = calculateRealWeeklyProgress(interviews);
+    const weeklyProgress = calculateRealWeeklyProgressFromInterviews(interviews);
     
     // Calculate REAL performance trends
-    const performanceTrends = calculateRealPerformanceTrends(interviews);
+    const performanceTrends = calculateRealPerformanceTrendsFromInterviews(interviews);
 
     const analyticsData = {
       overview: {
@@ -57,8 +56,8 @@ export const getAnalytics = async (req, res) => {
         completedSessions,
         averageScore: Math.round(averageScore * 10) / 10,
         totalPracticeTime: calculateTotalPracticeTime(interviews),
-        improvementRate: calculateImprovementRate(interviews),
-        currentStreak: calculateCurrentStreak(interviews),
+        improvementRate: calculateImprovementRateFromInterviews(interviews),
+        currentStreak: calculateCurrentStreakFromInterviews(interviews),
         totalQuestions
       },
       skillBreakdown,
@@ -67,9 +66,9 @@ export const getAnalytics = async (req, res) => {
       recentActivity: interviews.slice(0, 5).map(i => ({
         date: i.createdAt,
         role: i.role,
-        score: calculateInterviewScore(i),
+        score: calculateInterviewScoreFromInterview(i),
         status: i.status,
-        duration: calculateInterviewDuration(i)
+        duration: calculateInterviewDurationFromInterview(i)
       }))
     };
 
@@ -80,8 +79,149 @@ export const getAnalytics = async (req, res) => {
   }
 };
 
-// Helper functions to calculate real data
-const calculateRealSkillBreakdown = (interviews) => {
+// Individual route handlers
+export const calculateRealSkillBreakdown = async (req, res) => {
+  try {
+    const firebaseUid = req.firebaseUid;
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const interviews = await Interview.find({ user: user._id });
+    const skillBreakdown = calculateRealSkillBreakdownFromInterviews(interviews);
+    
+    res.status(200).json(skillBreakdown);
+  } catch (error) {
+    console.error('Error calculating skill breakdown:', error);
+    res.status(500).json({ error: 'Failed to calculate skill breakdown' });
+  }
+};
+
+export const calculateRealWeeklyProgress = async (req, res) => {
+  try {
+    const firebaseUid = req.firebaseUid;
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const interviews = await Interview.find({ user: user._id }).sort({ createdAt: -1 });
+    const weeklyProgress = calculateRealWeeklyProgressFromInterviews(interviews);
+    
+    res.status(200).json(weeklyProgress);
+  } catch (error) {
+    console.error('Error calculating weekly progress:', error);
+    res.status(500).json({ error: 'Failed to calculate weekly progress' });
+  }
+};
+
+export const calculateRealPerformanceTrends = async (req, res) => {
+  try {
+    const firebaseUid = req.firebaseUid;
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const interviews = await Interview.find({ user: user._id }).sort({ createdAt: -1 });
+    const performanceTrends = calculateRealPerformanceTrendsFromInterviews(interviews);
+    
+    res.status(200).json(performanceTrends);
+  } catch (error) {
+    console.error('Error calculating performance trends:', error);
+    res.status(500).json({ error: 'Failed to calculate performance trends' });
+  }
+};
+
+export const calculateImprovementRate = async (req, res) => {
+  try {
+    const firebaseUid = req.firebaseUid;
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const interviews = await Interview.find({ user: user._id }).sort({ createdAt: -1 });
+    const improvementRate = calculateImprovementRateFromInterviews(interviews);
+    
+    res.status(200).json({ improvementRate });
+  } catch (error) {
+    console.error('Error calculating improvement rate:', error);
+    res.status(500).json({ error: 'Failed to calculate improvement rate' });
+  }
+};
+
+export const calculateCurrentStreak = async (req, res) => {
+  try {
+    const firebaseUid = req.firebaseUid;
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const interviews = await Interview.find({ user: user._id });
+    const currentStreak = calculateCurrentStreakFromInterviews(interviews);
+    
+    res.status(200).json({ currentStreak });
+  } catch (error) {
+    console.error('Error calculating current streak:', error);
+    res.status(500).json({ error: 'Failed to calculate current streak' });
+  }
+};
+
+export const calculateInterviewScore = async (req, res) => {
+  try {
+    const { interviewId } = req.params;
+    const interview = await Interview.findById(interviewId);
+    
+    if (!interview) {
+      return res.status(404).json({ error: "Interview not found" });
+    }
+
+    // Verify the interview belongs to the user
+    const firebaseUid = req.firebaseUid;
+    const user = await User.findOne({ firebaseUid });
+    if (!user || !interview.user.equals(user._id)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const score = calculateInterviewScoreFromInterview(interview);
+    
+    res.status(200).json({ score });
+  } catch (error) {
+    console.error('Error calculating interview score:', error);
+    res.status(500).json({ error: 'Failed to calculate interview score' });
+  }
+};
+
+export const calculateInterviewDuration = async (req, res) => {
+  try {
+    const { interviewId } = req.params;
+    const interview = await Interview.findById(interviewId);
+    
+    if (!interview) {
+      return res.status(404).json({ error: "Interview not found" });
+    }
+
+    // Verify the interview belongs to the user
+    const firebaseUid = req.firebaseUid;
+    const user = await User.findOne({ firebaseUid });
+    if (!user || !interview.user.equals(user._id)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const duration = calculateInterviewDurationFromInterview(interview);
+    
+    res.status(200).json({ duration });
+  } catch (error) {
+    console.error('Error calculating interview duration:', error);
+    res.status(500).json({ error: 'Failed to calculate interview duration' });
+  }
+};
+
+// Helper functions (renamed to avoid conflicts with route handlers)
+const calculateRealSkillBreakdownFromInterviews = (interviews) => {
   const skills = {
     'Technical': { totalScore: 0, count: 0 },
     'Problem Solving': { totalScore: 0, count: 0 },
@@ -126,7 +266,7 @@ const calculateRealSkillBreakdown = (interviews) => {
   })).filter(item => item.questions > 0);
 };
 
-const calculateRealWeeklyProgress = (interviews) => {
+const calculateRealWeeklyProgressFromInterviews = (interviews) => {
   const last5Weeks = [];
   const now = new Date();
   
@@ -169,7 +309,7 @@ const calculateRealWeeklyProgress = (interviews) => {
   return last5Weeks;
 };
 
-const calculateRealPerformanceTrends = (interviews) => {
+const calculateRealPerformanceTrendsFromInterviews = (interviews) => {
   // Calculate trends based on recent performance vs older performance
   if (interviews.length < 2) {
     return { technical: 0, communication: 0, problemSolving: 0, confidence: 0 };
@@ -227,7 +367,7 @@ const calculateTotalPracticeTime = (interviews) => {
   return interviews.length * 45;
 };
 
-const calculateImprovementRate = (interviews) => {
+const calculateImprovementRateFromInterviews = (interviews) => {
   if (interviews.length < 2) return 0;
   
   const firstScores = [];
@@ -261,7 +401,7 @@ const calculateImprovementRate = (interviews) => {
   return firstAvg > 0 ? Math.round(((recentAvg - firstAvg) / firstAvg) * 100) : 0;
 };
 
-const calculateCurrentStreak = (interviews) => {
+const calculateCurrentStreakFromInterviews = (interviews) => {
   // Simple streak calculation based on consecutive days with interviews
   let streak = 0;
   const today = new Date();
@@ -284,7 +424,7 @@ const calculateCurrentStreak = (interviews) => {
   return streak;
 };
 
-const calculateInterviewScore = (interview) => {
+const calculateInterviewScoreFromInterview = (interview) => {
   let totalScore = 0;
   let questionCount = 0;
   
@@ -302,7 +442,7 @@ const calculateInterviewScore = (interview) => {
   return questionCount > 0 ? Math.round((totalScore / questionCount) * 10) / 10 : 0;
 };
 
-const calculateInterviewDuration = (interview) => {
+const calculateInterviewDurationFromInterview = (interview) => {
   // Estimate 45 minutes per interview
-  return 45;
+  return 15;
 };

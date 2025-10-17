@@ -1,17 +1,21 @@
 import { Interview } from "../models/interview.model.js";
 import { User } from "../models/user.model.js";
 import { generateOverallInterviewSummary } from "./llm.controller.js";
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 
-
 export const startInterview = asyncHandler(async (req, res) => {
-  const { role, totalRounds = 3, difficulty = "Intermediate", previousInterviewId } = req.body;
+  const {
+    role,
+    totalRounds = 3,
+    difficulty = "Intermediate",
+    previousInterviewId,
+  } = req.body;
   const firebaseUid = req.firebaseUid;
 
-  console.log('Starting interview for firebaseUid:', firebaseUid);
+  console.log("Starting interview for firebaseUid:", firebaseUid);
 
   // Validate inputs
   if (!role) {
@@ -19,7 +23,10 @@ export const startInterview = asyncHandler(async (req, res) => {
   }
 
   if (!["Beginner", "Intermediate", "Advanced"].includes(difficulty)) {
-    throw new ApiError(400, "Invalid difficulty level. Choose Beginner, Intermediate, or Advanced.");
+    throw new ApiError(
+      400,
+      "Invalid difficulty level. Choose Beginner, Intermediate, or Advanced."
+    );
   }
 
   try {
@@ -31,9 +38,9 @@ export const startInterview = asyncHandler(async (req, res) => {
     // Validate previousInterviewId for retakes
     let retakeOf = null;
     if (previousInterviewId) {
-      const previousInterview = await Interview.findOne({ 
-        interviewId: previousInterviewId, 
-        user: user._id 
+      const previousInterview = await Interview.findOne({
+        interviewId: previousInterviewId,
+        user: user._id,
       });
       if (!previousInterview) {
         throw new ApiError(404, "Previous interview not found");
@@ -48,7 +55,9 @@ export const startInterview = asyncHandler(async (req, res) => {
     let newInterviewId;
     do {
       newInterviewId = uuidv4();
-      const existingInterview = await Interview.findOne({ interviewId: newInterviewId });
+      const existingInterview = await Interview.findOne({
+        interviewId: newInterviewId,
+      });
       if (!existingInterview) break; // Exit loop if ID is unique
     } while (true);
 
@@ -77,13 +86,17 @@ export const startInterview = asyncHandler(async (req, res) => {
       lastActiveAt: new Date(),
     });
 
-    await interview.populate('user', 'displayName profile');
-    return res
-      .status(201)
-      .json(new ApiResponse(201, { 
-        interviewId: interview.interviewId,
-        interview 
-      }, "Interview started successfully"));
+    await interview.populate("user", "displayName profile");
+    return res.status(201).json(
+      new ApiResponse(
+        201,
+        {
+          interviewId: interview.interviewId,
+          interview,
+        },
+        "Interview started successfully"
+      )
+    );
   } catch (error) {
     console.error("Error starting interview:", error);
     throw new ApiError(500, `Internal server error: ${error.message}`);
@@ -106,8 +119,8 @@ export const getActiveInterview = async (req, res) => {
 
     const interview = await Interview.findOne({
       interviewId,
-      user: user._id
-    }).populate('user', 'displayName profile');
+      user: user._id,
+    }).populate("user", "displayName profile");
 
     if (!interview) {
       return res.status(404).json({ error: "Interview not found" });
@@ -116,7 +129,9 @@ export const getActiveInterview = async (req, res) => {
     return res.status(200).json({ interview });
   } catch (error) {
     console.error("Error fetching active interview:", error);
-    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+    return res
+      .status(500)
+      .json({ error: `Internal server error: ${error.message}` });
   }
 };
 
@@ -132,23 +147,34 @@ export const getInterviewStats = async (req, res) => {
     const interviews = await Interview.find({ user: user._id });
 
     const totalInterviews = interviews.length;
-    const completedInterviews = interviews.filter(i => i.status === 'completed').length;
-    const activeInterviews = interviews.filter(i => i.status === 'active').length;
+    const completedInterviews = interviews.filter(
+      (i) => i.status === "completed"
+    ).length;
+    const activeInterviews = interviews.filter(
+      (i) => i.status === "active"
+    ).length;
 
     let totalScore = 0;
     let scoredInterviews = 0;
 
-    interviews.forEach(interview => {
-      if (interview.status === 'completed' && interview.rounds) {
-        const completedRounds = interview.rounds.filter(round => round.status === 'completed');
+    interviews.forEach((interview) => {
+      if (interview.status === "completed" && interview.rounds) {
+        const completedRounds = interview.rounds.filter(
+          (round) => round.status === "completed"
+        );
         if (completedRounds.length > 0) {
-          const interviewScore = completedRounds.reduce((sum, round) => {
-            if (round.questions && round.questions.length > 0) {
-              const roundScore = round.questions.reduce((roundSum, q) => roundSum + (q.score || 0), 0) / round.questions.length;
-              return sum + roundScore;
-            }
-            return sum;
-          }, 0) / completedRounds.length;
+          const interviewScore =
+            completedRounds.reduce((sum, round) => {
+              if (round.questions && round.questions.length > 0) {
+                const roundScore =
+                  round.questions.reduce(
+                    (roundSum, q) => roundSum + (q.score || 0),
+                    0
+                  ) / round.questions.length;
+                return sum + roundScore;
+              }
+              return sum;
+            }, 0) / completedRounds.length;
 
           totalScore += interviewScore;
           scoredInterviews++;
@@ -156,31 +182,54 @@ export const getInterviewStats = async (req, res) => {
       }
     });
 
-    const averageScore = scoredInterviews > 0 ? Math.round((totalScore / scoredInterviews) * 10) / 10 : 0;
-    const completionRate = totalInterviews > 0 ? Math.round((completedInterviews / totalInterviews) * 100) : 0;
+    const averageScore =
+      scoredInterviews > 0
+        ? Math.round((totalScore / scoredInterviews) * 10) / 10
+        : 0;
+    const completionRate =
+      totalInterviews > 0
+        ? Math.round((completedInterviews / totalInterviews) * 100)
+        : 0;
 
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const recentActivity = interviews.filter(i => new Date(i.createdAt) > oneWeekAgo).length;
+    const recentActivity = interviews.filter(
+      (i) => new Date(i.createdAt) > oneWeekAgo
+    ).length;
 
     const totalPracticeTime = interviews.reduce((total, interview) => {
       if (interview.rounds) {
-        return total + interview.rounds.filter(round => round.status === 'completed').length * 30;
+        return (
+          total +
+          interview.rounds.filter((round) => round.status === "completed")
+            .length *
+            30
+        );
       }
       return total;
     }, 0);
 
     const skillDistribution = {};
-    interviews.forEach(interview => {
-      if (interview.status === 'completed' && interview.rounds) {
-        interview.rounds.forEach(round => {
+    interviews.forEach((interview) => {
+      if (interview.status === "completed" && interview.rounds) {
+        interview.rounds.forEach((round) => {
           if (round.questions) {
-            round.questions.forEach(question => {
+            round.questions.forEach((question) => {
               if (question.feedback) {
-                const skills = ['javascript', 'react', 'node', 'python', 'java', 'sql', 'system design', 'algorithms'];
-                skills.forEach(skill => {
+                const skills = [
+                  "javascript",
+                  "react",
+                  "node",
+                  "python",
+                  "java",
+                  "sql",
+                  "system design",
+                  "algorithms",
+                ];
+                skills.forEach((skill) => {
                   if (question.feedback.toLowerCase().includes(skill)) {
-                    skillDistribution[skill] = (skillDistribution[skill] || 0) + 1;
+                    skillDistribution[skill] =
+                      (skillDistribution[skill] || 0) + 1;
                   }
                 });
               }
@@ -204,20 +253,28 @@ export const getInterviewStats = async (req, res) => {
         .reduce((obj, [key, value]) => {
           obj[key] = value;
           return obj;
-        }, {})
+        }, {}),
     };
 
     return res.status(200).json(stats);
   } catch (error) {
     console.error("Error fetching interview stats:", error);
-    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+    return res
+      .status(500)
+      .json({ error: `Internal server error: ${error.message}` });
   }
 };
 
 export const getAllInterviews = async (req, res) => {
   try {
     const firebaseUid = req.firebaseUid;
-    const { status, limit = 10, page = 1, sortBy = 'createdAt', order = 'desc' } = req.query;
+    const {
+      status,
+      limit = 10,
+      page = 1,
+      sortBy = "createdAt",
+      order = "desc",
+    } = req.query;
 
     const user = await User.findOne({ firebaseUid });
     if (!user) {
@@ -230,53 +287,72 @@ export const getAllInterviews = async (req, res) => {
     }
 
     const sortOptions = {};
-    sortOptions[sortBy] = order === 'desc' ? -1 : 1;
+    sortOptions[sortBy] = order === "desc" ? -1 : 1;
 
     const limitValue = parseInt(limit) || 10;
     const skip = (parseInt(page) - 1) * limitValue;
 
     const [interviews, totalCount] = await Promise.all([
       Interview.find(query)
-        .populate('user', 'displayName profile')
+        .populate("user", "displayName profile")
         .sort(sortOptions)
         .skip(skip)
         .limit(limitValue),
-      Interview.countDocuments(query)
+      Interview.countDocuments(query),
     ]);
 
-    const enhancedInterviews = interviews.map(interview => {
+    const enhancedInterviews = interviews.map((interview) => {
       const interviewObj = interview.toObject();
 
       if (interviewObj.rounds && interviewObj.totalRounds) {
-        const completedRounds = interviewObj.rounds.filter(round => round.status === 'completed').length;
-        interviewObj.progressPercentage = Math.round((completedRounds / interviewObj.totalRounds) * 100);
+        const completedRounds = interviewObj.rounds.filter(
+          (round) => round.status === "completed"
+        ).length;
+        interviewObj.progressPercentage = Math.round(
+          (completedRounds / interviewObj.totalRounds) * 100
+        );
       } else {
         interviewObj.progressPercentage = 0;
       }
 
       interviewObj.overallScore = 0;
-      if (interviewObj.status === 'completed' && interviewObj.rounds) {
-        const completedRounds = interviewObj.rounds.filter(round => round.status === 'completed');
+      if (interviewObj.status === "completed" && interviewObj.rounds) {
+        const completedRounds = interviewObj.rounds.filter(
+          (round) => round.status === "completed"
+        );
         if (completedRounds.length > 0) {
           const totalScore = completedRounds.reduce((sum, round) => {
             if (round.questions && round.questions.length > 0) {
-              const roundScore = round.questions.reduce((roundSum, q) => roundSum + (q.score || 0), 0) / round.questions.length;
+              const roundScore =
+                round.questions.reduce(
+                  (roundSum, q) => roundSum + (q.score || 0),
+                  0
+                ) / round.questions.length;
               return sum + roundScore;
             }
             return sum;
           }, 0);
-          interviewObj.overallScore = Math.round((totalScore / completedRounds.length) * 10) / 10;
+          interviewObj.overallScore =
+            Math.round((totalScore / completedRounds.length) * 10) / 10;
         }
       }
 
-      interviewObj.formattedCreatedAt = new Date(interviewObj.createdAt).toLocaleDateString();
-      interviewObj.formattedLastActive = new Date(interviewObj.lastActiveAt).toLocaleDateString();
+      interviewObj.formattedCreatedAt = new Date(
+        interviewObj.createdAt
+      ).toLocaleDateString();
+      interviewObj.formattedLastActive = new Date(
+        interviewObj.lastActiveAt
+      ).toLocaleDateString();
 
       return interviewObj;
     });
 
-    const activeCount = enhancedInterviews.filter(i => i.status === 'active').length;
-    const completedCount = enhancedInterviews.filter(i => i.status === 'completed').length;
+    const activeCount = enhancedInterviews.filter(
+      (i) => i.status === "active"
+    ).length;
+    const completedCount = enhancedInterviews.filter(
+      (i) => i.status === "completed"
+    ).length;
 
     return res.status(200).json({
       interviews: enhancedInterviews,
@@ -284,11 +360,13 @@ export const getAllInterviews = async (req, res) => {
       activeCount,
       completedCount,
       page: parseInt(page),
-      limit: limitValue
+      limit: limitValue,
     });
   } catch (error) {
     console.error("Error fetching interviews:", error);
-    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+    return res
+      .status(500)
+      .json({ error: `Internal server error: ${error.message}` });
   }
 };
 export const getInterviewDetails = async (req, res) => {
@@ -303,8 +381,8 @@ export const getInterviewDetails = async (req, res) => {
 
     const interview = await Interview.findOne({
       interviewId,
-      user: user._id
-    }).populate('user', 'displayName profile');
+      user: user._id,
+    }).populate("user", "displayName profile");
 
     if (!interview) {
       return res.status(404).json({ error: "Interview not found" });
@@ -313,13 +391,21 @@ export const getInterviewDetails = async (req, res) => {
     const interviewObj = interview.toObject();
 
     if (interviewObj.rounds) {
-      interviewObj.rounds = interviewObj.rounds.map(round => {
+      interviewObj.rounds = interviewObj.rounds.map((round) => {
         const roundObj = { ...round };
         if (round.questions && round.questions.length > 0) {
-          const totalScore = round.questions.reduce((sum, q) => sum + (q.score || 0), 0);
-          roundObj.averageScore = Math.round((totalScore / round.questions.length) * 10) / 10;
-          roundObj.maxScore = Math.max(...round.questions.map(q => q.score || 0));
-          roundObj.minScore = Math.min(...round.questions.map(q => q.score || 0));
+          const totalScore = round.questions.reduce(
+            (sum, q) => sum + (q.score || 0),
+            0
+          );
+          roundObj.averageScore =
+            Math.round((totalScore / round.questions.length) * 10) / 10;
+          roundObj.maxScore = Math.max(
+            ...round.questions.map((q) => q.score || 0)
+          );
+          roundObj.minScore = Math.min(
+            ...round.questions.map((q) => q.score || 0)
+          );
         } else {
           roundObj.averageScore = 0;
           roundObj.maxScore = 0;
@@ -330,14 +416,20 @@ export const getInterviewDetails = async (req, res) => {
     }
 
     if (interviewObj.rounds && interviewObj.totalRounds) {
-      const completedRounds = interviewObj.rounds.filter(round => round.status === 'completed').length;
-      interviewObj.progressPercentage = Math.round((completedRounds / interviewObj.totalRounds) * 100);
+      const completedRounds = interviewObj.rounds.filter(
+        (round) => round.status === "completed"
+      ).length;
+      interviewObj.progressPercentage = Math.round(
+        (completedRounds / interviewObj.totalRounds) * 100
+      );
     }
 
     return res.status(200).json({ interview: interviewObj });
   } catch (error) {
     console.error("Error fetching interview details:", error);
-    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+    return res
+      .status(500)
+      .json({ error: `Internal server error: ${error.message}` });
   }
 };
 
@@ -354,8 +446,8 @@ export const completeRound = async (req, res) => {
 
     const interview = await Interview.findOne({
       interviewId,
-      user: user._id
-    }).populate('user', 'displayName profile');
+      user: user._id,
+    }).populate("user", "displayName profile");
 
     if (!interview) {
       return res.status(404).json({ error: "Interview not found" });
@@ -372,21 +464,25 @@ export const completeRound = async (req, res) => {
     interview.rounds[roundIndex] = {
       roundNumber,
       status: "completed",
-      questions: questions.map(q => ({
+      questions: questions.map((q) => ({
         ...q,
         // Ensure all new fields are preserved
         answerSummary: q.answerSummary,
         keywords: q.keywords,
-        expectedAnswer: q.expectedAnswer
+        expectedAnswer: q.expectedAnswer,
       })),
       startedAt: interview.rounds[roundIndex]?.startedAt || new Date(),
-      completedAt: new Date()
+      completedAt: new Date(),
     };
 
     // Rest of the function remains same...
     interview.currentRound = roundNumber + 1;
-    const completedRounds = interview.rounds.filter(round => round.status === "completed").length;
-    interview.progress = Math.round((completedRounds / interview.totalRounds) * 100);
+    const completedRounds = interview.rounds.filter(
+      (round) => round.status === "completed"
+    ).length;
+    interview.progress = Math.round(
+      (completedRounds / interview.totalRounds) * 100
+    );
 
     if (roundNumber === interview.totalRounds) {
       interview.status = "completed";
@@ -403,18 +499,20 @@ export const completeRound = async (req, res) => {
 
     interview.lastActiveAt = new Date();
     await interview.save();
-    await interview.populate('user', 'displayName profile');
+    await interview.populate("user", "displayName profile");
 
     return res.status(200).json({
       message: `Round ${roundNumber} completed successfully`,
       progress: interview.progress,
       status: interview.status,
       nextRound: interview.currentRound,
-      interview
+      interview,
     });
   } catch (error) {
     console.error("Error completing round:", error);
-    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+    return res
+      .status(500)
+      .json({ error: `Internal server error: ${error.message}` });
   }
 };
 
@@ -430,7 +528,7 @@ export const startRound = async (req, res) => {
 
     const interview = await Interview.findOne({
       interviewId,
-      user: user._id
+      user: user._id,
     });
 
     if (!interview) {
@@ -445,7 +543,7 @@ export const startRound = async (req, res) => {
         status: "in_progress",
         questions: [],
         startedAt: new Date(),
-        completedAt: null
+        completedAt: null,
       };
     } else {
       interview.rounds[roundIndex].status = "in_progress";
@@ -457,11 +555,13 @@ export const startRound = async (req, res) => {
 
     return res.status(200).json({
       message: `Round ${roundNumber} started`,
-      round: interview.rounds[roundIndex]
+      round: interview.rounds[roundIndex],
     });
   } catch (error) {
     console.error("Error starting round:", error);
-    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+    return res
+      .status(500)
+      .json({ error: `Internal server error: ${error.message}` });
   }
 };
 
@@ -477,7 +577,7 @@ export const cancelInterview = async (req, res) => {
 
     const interview = await Interview.findOne({
       interviewId,
-      user: user._id
+      user: user._id,
     });
 
     if (!interview) {
@@ -493,12 +593,14 @@ export const cancelInterview = async (req, res) => {
       interview: {
         interviewId: interview.interviewId,
         status: interview.status,
-        lastActiveAt: interview.lastActiveAt
-      }
+        lastActiveAt: interview.lastActiveAt,
+      },
     });
   } catch (error) {
     console.error("Error cancelling interview:", error);
-    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+    return res
+      .status(500)
+      .json({ error: `Internal server error: ${error.message}` });
   }
 };
 
@@ -518,7 +620,7 @@ export const deleteInterview = async (req, res) => {
 
     const interview = await Interview.findOneAndDelete({
       interviewId,
-      user: user._id
+      user: user._id,
     });
 
     if (!interview) {
@@ -536,6 +638,8 @@ export const deleteInterview = async (req, res) => {
     return res.status(200).json({ message: "Interview deleted successfully" });
   } catch (error) {
     console.error("Error deleting interview:", error);
-    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+    return res
+      .status(500)
+      .json({ error: `Internal server error: ${error.message}` });
   }
 };
