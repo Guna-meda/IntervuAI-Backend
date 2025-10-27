@@ -7,9 +7,21 @@ import admin from "firebase-admin";
 
 const app = express();
 
+const allowedOrigins = [
+  'https://intervu-ai-eta.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
-    credentials: true,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
 }));
 
 app.use(express.json({
