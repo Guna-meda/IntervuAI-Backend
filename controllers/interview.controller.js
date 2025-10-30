@@ -7,12 +7,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 
 export const startInterview = asyncHandler(async (req, res) => {
-  const {
-    role,
-    totalRounds = 3,
-    difficulty = "Intermediate",
-    previousInterviewId,
-  } = req.body;
+  const { role, totalRounds = 3, difficulty = "Intermediate", previousInterviewId, skills = [] } = req.body;
   const firebaseUid = req.firebaseUid;
 
   console.log("Starting interview for firebaseUid:", firebaseUid);
@@ -82,6 +77,7 @@ export const startInterview = asyncHandler(async (req, res) => {
       currentRound: 1,
       rounds,
       progress: 0,
+      skills: Array.isArray(skills) ? skills : [],
       createdAt: new Date(),
       lastActiveAt: new Date(),
     });

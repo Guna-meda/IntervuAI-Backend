@@ -60,6 +60,10 @@ const interviewSchema = new mongoose.Schema({
     ref: 'Interview',
     default: null,
   },
+  skills: [{
+  skill: { type: String, required: true },
+  proficiency: { type: Number, min: 1, max: 5, required: true }
+}],
   createdAt: { type: Date, default: Date.now },
   lastActiveAt: { type: Date, default: Date.now },
   completedAt: { type: Date }
