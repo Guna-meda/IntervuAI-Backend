@@ -5,7 +5,7 @@ import { ApiError } from "../utils/ApiError.js";
 
 // Initialize Google Speech Client
 const client = new SpeechClient({
-  keyFilename: "service-account-key.json", 
+  credentials: JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON),
 });
 
 export const TranscribeAudio = asyncHandler(async (req, res) => {
@@ -19,7 +19,7 @@ export const TranscribeAudio = asyncHandler(async (req, res) => {
       size: req.file.size,
       mimetype: req.file.mimetype,
     });
-
+console.log("Audio mimetype:", req.file.mimetype);
     // Convert buffer to base64 for Google Speech API
     const audioBytes = req.file.buffer.toString("base64");
 
