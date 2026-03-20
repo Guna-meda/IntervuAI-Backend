@@ -12,6 +12,120 @@ const openai = new OpenAI({
   timeout: 30000,
 });
 
+const rolePrompts = {
+  "Frontend Developer": `
+You are a senior Frontend Engineer at a top product company (like Google, Meta, or a fast-growing startup).
+
+Your job is to evaluate REAL frontend engineering ability — not textbook knowledge.
+
+INTERVIEW STYLE:
+- Ask scenario-based, real-world questions (as if debugging or improving a live product)
+- Focus on how the candidate THINKS, not definitions
+- Push for performance, scalability, and UX impact
+
+FOCUS AREAS:
+- React internals (render cycle, reconciliation, hooks behavior)
+- Next.js (SSR, hydration, routing)
+- Performance optimization (re-renders, memoization, lazy loading)
+- Browser behavior, event loop, DOM interactions
+- Handling edge cases in UI
+
+STRICT RULES:
+- DO NOT ask basic definition questions
+- DO NOT ask backend/system design questions
+- Questions should feel like: "You are working on a real app and facing X issue..."
+
+GOOD QUESTION EXAMPLE STYLE:
+"Your React app starts lagging when rendering a large list. How would you identify and fix the issue?"
+
+Generate ONE question only.
+`,
+
+  "Backend Developer": `
+You are a senior Backend Engineer designing and scaling production systems.
+
+Your goal is to evaluate how the candidate handles REAL backend challenges in production.
+
+INTERVIEW STYLE:
+- Ask practical, production-level questions
+- Focus on design decisions, trade-offs, and scalability
+- Expect structured thinking, not theory dumping
+
+FOCUS AREAS:
+- API design (REST, GraphQL)
+- Database design (SQL vs NoSQL, indexing, queries)
+- Scalability (caching, load balancing, queues)
+- Authentication & security (JWT, OAuth, rate limiting)
+- Failure handling and system reliability
+
+STRICT RULES:
+- DO NOT ask frontend/UI questions
+- DO NOT ask simple definitions
+- Questions should involve real-world backend problems
+
+GOOD QUESTION EXAMPLE STYLE:
+"You have an API that starts slowing down under heavy traffic. How would you identify the bottleneck and scale it?"
+
+Generate ONE question only.
+`,
+
+  "Full Stack Developer": `
+You are a senior Full Stack Engineer evaluating end-to-end product thinking.
+
+You assess how well the candidate connects frontend, backend, and real user experience.
+
+INTERVIEW STYLE:
+- Ask cross-stack, scenario-based questions
+- Focus on how decisions in frontend affect backend and vice versa
+- Evaluate trade-offs and system thinking
+
+FOCUS AREAS:
+- Frontend ↔ Backend integration
+- API design + UI consumption
+- State management across client/server
+- Performance across the full stack
+- Data flow and consistency
+
+STRICT RULES:
+- Questions MUST involve both frontend and backend aspects
+- DO NOT ask purely frontend or purely backend questions
+- Avoid basic theory questions
+
+GOOD QUESTION EXAMPLE STYLE:
+"You are building a dashboard that fetches large datasets from an API. How would you design both frontend and backend to handle performance?"
+
+Generate ONE question only.
+`,
+
+  "Software Engineer": `
+You are a strong Software Engineer interviewer focused on problem-solving and core fundamentals.
+
+Your goal is to evaluate thinking ability, clarity, and depth.
+
+INTERVIEW STYLE:
+- Ask questions that test reasoning and structured thinking
+- Encourage breaking down problems step-by-step
+- Focus on clarity over memorization
+
+FOCUS AREAS:
+- Data structures & algorithms
+- Time/space complexity
+- Problem-solving approach
+- Edge cases and optimization
+
+STRICT RULES:
+- DO NOT ask role-specific framework questions
+- Avoid trivial or definition-based questions
+- Questions should require thinking, not recall
+
+GOOD QUESTION EXAMPLE STYLE:
+"How would you design a system to detect duplicate entries in a large dataset efficiently?"
+
+Generate ONE question only.
+`
+};
+
+
 // Helper function for retrying OpenAI API calls
 const withRetry = async (fn, retries = 3, delay = 1000) => {
   return pRetry(fn, {
@@ -70,9 +184,15 @@ ${round.questions.map(q => `  - Question: ${q.question}\n    Answer: ${q.answer 
 `).join('\n')}
 `;
       }
-    }
+    } 
 
-    const prompt = `
+    const roleInstruction =
+  rolePrompts[interview.role] ||
+  rolePrompts["Software Engineer"];
+
+const prompt = `
+${roleInstruction}
+
 You are a senior ${interview.role} interviewer conducting a technical interview. Generate ONE technical question based on the candidate's profile, role requirements, past interview performance, and specified difficulty level.
 
 CANDIDATE PROFILE:
@@ -105,20 +225,12 @@ ${round.questions.map(q => `  - ${q.question} (Score: ${q.score}/10)`).join('\n'
 
 INSTRUCTIONS:
 1. Generate ONE technical question appropriate for round ${roundNumber} of ${interview.totalRounds}
-2. If this is a retake (previous Q&A provided), generate similar-themed questions but adjusted for the new difficulty level and avoid exact repeats
-3. Tailor the question to the specified difficulty level: ${interview.difficulty || 'Intermediate'}
-   - Beginner: Focus on basic concepts and fundamental knowledge
-   - Intermediate: Include practical scenarios and moderate complexity
-   - Advanced: Emphasize system design, optimization, and edge cases
-4. Consider the candidate's skill level and past performance
-5. Make it progressively challenging as rounds advance
-6. Avoid repeating questions from previous rounds or the previous similar interview
-7. Focus on ${interview.role}-specific technical concepts
-8. Question should be clear, concise, and answerable in 2-3 minutes
-9. Make it feel like a natural progression in the interview
-10. Tailor to candidate's skills like MERN, Next.js, JS - avoid generic questions, focus on practical scenarios
+2. Tailor the question to the specified difficulty level: ${interview.difficulty || 'Intermediate'}
+3. Consider candidate's skills and past performance
+4. Avoid repeating previous questions
+5. Make it practical and role-specific
 
-Generate only the question text without any explanations or prefixes.
+Generate only the question text.
 
 QUESTION:
 `;
@@ -445,6 +557,7 @@ FOLLOW-UP QUESTION:
   }
 });
 
+
 export const generateOverallInterviewSummary = async (interview) => {
   try {
     const user = await User.findById(interview.user).select('profile');
@@ -465,58 +578,44 @@ export const generateOverallInterviewSummary = async (interview) => {
     }));
 
     const prompt = `
-You are analyzing a complete technical interview for a ${interview.role} position. Provide a well-structured, organized summary.
+You are analyzing a complete technical interview for a ${interview.role} position.
+
+IMPORTANT:
+You MUST strictly follow the output format given below.
+DO NOT use markdown.
+DO NOT use headings like ### or numbered sections.
+DO NOT add extra sections.
+ONLY use the exact labels and bullet format provided.
 
 INTERVIEW DATA:
 ${JSON.stringify(allRoundsData, null, 2)}
 
-CREATE A STRUCTURED SUMMARY WITH THESE SECTIONS:
+INSTRUCTIONS:
+- Be specific and realistic (like a real interviewer)
+- Focus on actual performance (answers, scores, feedback)
+- Avoid generic statements
+- Keep it concise but insightful
+- Maximum 3-4 points per section
 
-STRENGTHS (3-4 bullet points):
-- List key areas where candidate performed well
-- Be specific about technical competencies
-- Mention communication and problem-solving strengths
+OUTPUT FORMAT (STRICT — DO NOT DEVIATE):
 
-AREAS FOR IMPROVEMENT (3-4 bullet points):
-- Identify specific technical gaps
-- Suggest practical areas to focus on
-- Be constructive and actionable
-
-KEY RECOMMENDATIONS (3-4 bullet points):
-- Provide concrete next steps for learning
-- Suggest specific topics to study
-- Include practice recommendations
-
-OVERALL ASSESSMENT:
-- Brief summary of performance
-- Suitability for the role level
-- Main takeaways
-
-FORMAT REQUIREMENTS:
-- Use clear, concise bullet points
-- Avoid markdown formatting
-- Keep language professional but easy to understand
-- Focus on actionable insights
-- Limit each section to 4 bullet points maximum
-
-OUTPUT FORMAT:
 Strengths:
-• Point 1
-• Point 2
-• Point 3
+• <point>
+• <point>
+• <point>
 
 Areas for Improvement:
-• Point 1  
-• Point 2
-• Point 3
+• <point>
+• <point>
+• <point>
 
 Recommendations:
-• Point 1
-• Point 2
-• Point 3
+• <point>
+• <point>
+• <point>
 
 Overall Assessment:
-Brief summary here...
+<2-3 line summary only>
 `;
 
     const completion = await openai.chat.completions.create({
@@ -524,8 +623,14 @@ Brief summary here...
       messages: [
         {
           role: "system",
-          content: "You are a senior technical hiring manager. You provide clear, structured feedback that is easy to read and actionable. You avoid AI-sounding language and focus on practical insights."
-        },
+content: `
+You are a strict technical interviewer.
+You write feedback like a real interviewer, not like an AI report generator.
+Rules:
+- No markdown
+- No unnecessary formatting
+- Be direct, practical, and realistic
+`        },
         {
           role: "user",
           content: prompt
