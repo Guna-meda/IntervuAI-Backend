@@ -2,6 +2,8 @@ import { SpeechClient } from "@google-cloud/speech";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
+import textToSpeech from "@google-cloud/text-to-speech";
+
 
 // Initialize Google Speech Client
 const client = new SpeechClient({
@@ -85,3 +87,37 @@ console.log("Audio mimetype:", req.file.mimetype);
     throw new ApiError(500, "Transcription failed", [err.message || String(err)]);
   }
 });
+
+
+const ttsClient = new textToSpeech.TextToSpeechClient({
+  credentials: JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON),
+});
+
+export const generateSpeech = async (text) => {
+  const cleanText = text
+  .replace(/[`*_]/g, '')
+  .replace(/\buseState\b/g, 'use state')
+  .replace(/\buseEffect\b/g, 'use effect')
+  .replace(/\bAPI\b/g, 'A P I')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const request = {
+  input: {
+    ssml: `<speak>${cleanText}</speak>`
+  },
+  voice: {
+    languageCode: "en-US",
+    name: "en-US-Wavenet-F",
+  },
+  audioConfig: {
+    audioEncoding: "MP3",
+    speakingRate: 0.85,
+    pitch: -1.0,
+  },
+};
+
+  const [response] = await ttsClient.synthesizeSpeech(request);
+
+  return response.audioContent; // buffer
+};

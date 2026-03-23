@@ -5,6 +5,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { Interview } from "../models/interview.model.js";
 import { User } from "../models/user.model.js";
 import pRetry from "p-retry";
+import { generateSpeech } from "./speech.controller.js"; // 🔥 NEW
 
 // Initialize OpenAI client with increased timeout
 const openai = new OpenAI({
@@ -235,29 +236,8 @@ Generate only the question text.
 QUESTION:
 `;
 
-    // Log prompt preview before calling OpenAI
-    try { 
-      console.log('[LLM] generatePreparedQuestion prompt preview (truncated 1200 chars):', prompt.slice(0, 1200)); 
-    } catch (e) { 
-      console.warn('LLM log preview failed', e); 
-    }
-
     const completion = await withRetry(async () => {
-      console.log('Sending OpenAI request with payload:', {
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: `You are a senior ${interview.role} technical interviewer. You ask insightful, role-specific technical questions that assess both depth and breadth of knowledge. You adapt your questions based on the candidate's experience level, past performance, and specified difficulty level.`
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        max_tokens: 150,
-        temperature: 0.8,
-      });
+     
       return await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [
@@ -275,23 +255,26 @@ QUESTION:
       });
     });
 
-    console.log('OpenAI response:', completion);
+const preparedQuestion = completion.choices[0]?.message?.content?.trim();
 
-    const preparedQuestion = completion.choices[0]?.message?.content?.trim();
+if (!preparedQuestion) {
+  throw new ApiError(500, "Failed to generate prepared question");
+}
 
-    if (!preparedQuestion) {
-      throw new ApiError(500, "Failed to generate prepared question");
-    }
+// 🔥 ADD THIS (TTS)
+const audioBuffer = await generateSpeech(preparedQuestion);
+const audioBase64 = audioBuffer.toString("base64");
 
     console.log('Generated prepared question:', preparedQuestion);
 
     return res
       .status(200)
-      .json(new ApiResponse(200, { 
-        question: preparedQuestion,
-        questionType: "prepared",
-        roundNumber: roundNumber
-      }, "Prepared question generated successfully"));
+     .json(new ApiResponse(200, { 
+  question: preparedQuestion,
+  audio: audioBase64, // 🔥 NEW
+  questionType: "prepared",
+  roundNumber: roundNumber
+}, "Prepared question generated successfully"));
 
   } catch (error) {
     console.error("OpenAI API error:", {
@@ -424,17 +407,19 @@ QUESTION:
       },
     };
 
-    const roleFallback = fallbackQuestions[Interview.role] || fallbackQuestions["Software Engineer"];
-    const difficultyFallback = roleFallback[Interview.difficulty] || roleFallback["Intermediate"];
+    const roleFallback = fallbackQuestions[interview.role] || fallbackQuestions["Software Engineer"];
+    const difficultyFallback = roleFallback[interview.difficulty] || roleFallback["Intermediate"];
     const fallbackQuestion = difficultyFallback[Math.floor(Math.random() * difficultyFallback.length)];
 
-    return res
-      .status(200)
-      .json(new ApiResponse(200, { 
-        question: fallbackQuestion,
-        questionType: "prepared",
-        roundNumber: roundNumber
-      }, "Used fallback prepared question"));
+  const audioBuffer = await generateSpeech(fallbackQuestion);
+const audioBase64 = audioBuffer.toString("base64");
+
+return res.status(200).json(new ApiResponse(200, { 
+  question: fallbackQuestion,
+  audio: audioBase64, // 🔥 ADD THIS
+  questionType: "prepared",
+  roundNumber: roundNumber
+}, "Used fallback prepared question"));
   }
 });
 
@@ -520,12 +505,16 @@ FOLLOW-UP QUESTION:
       throw new ApiError(500, "Failed to generate follow-up question");
     }
 
+    const audioBuffer = await generateSpeech(followUpQuestion);
+const audioBase64 = audioBuffer.toString("base64");
+
     console.log('Generated context-aware follow-up:', followUpQuestion);
 
     return res
       .status(200)
       .json(new ApiResponse(200, { 
         followUpQuestion: followUpQuestion,
+audio: audioBase64,
         questionType: "followup",
         roundNumber: roundNumber,
         parentQuestion: currentQuestion,
@@ -544,11 +533,15 @@ FOLLOW-UP QUESTION:
     };
     
     const fallbackQuestion = fallbackQuestions[followUpType] || "Let's explore this topic further...";
+
+    const audioBuffer = await generateSpeech(fallbackQuestion);
+const audioBase64 = audioBuffer.toString("base64");
     
     return res
       .status(200)
       .json(new ApiResponse(200, { 
         followUpQuestion: fallbackQuestion,
+        audio: audioBase64, // 🔥 ADD THIS
         questionType: "followup",
         roundNumber: roundNumber,
         parentQuestion: currentQuestion,
