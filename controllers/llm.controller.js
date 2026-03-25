@@ -689,6 +689,13 @@ OUTPUT FORMAT (as JSON):
   "followUpType": "deeper|clarification|rephrase|alternative|none"
 }
 
+CRITICAL SCORING RULE:
+- If the candidate answer is effectively "I don't know" (examples: "i don't know", "idk", "not sure", "no idea", empty/near-empty content), you MUST set:
+  - "accuracy": "idk"
+  - "needsFollowUp": false
+  - "followUpType": "none"
+- Do not classify such responses as partial/good/excellent.
+
 IMPORTANT FOR EXPECTED ANSWER:
 - Use simple, clear language
 - Avoid complex technical jargon
@@ -774,7 +781,7 @@ const calculateScoreFromAccuracy = (accuracy) => {
     "good": 7,
     "partial": 5,
     "incorrect": 2,
-    "idk": 1
+    "idk": 0
   };
   return scoreMap[accuracy] || 5;
 };
