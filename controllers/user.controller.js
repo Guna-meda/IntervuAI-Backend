@@ -8,7 +8,9 @@ import { uploadToCloudinary } from '../utils/cloudinary.js';
 export const createOrFetchUser = async (req, res) => {
   try {
     if (mongoose.connection.readyState !== 1) {
-      throw new Error("MongoDB is not connected");
+      return res.status(503).json({
+        error: "Database connection is not ready. Please try again in a moment.",
+      });
     }
 
     const { uid, email, displayName } = req.body;

@@ -224,12 +224,62 @@ Round ${index + 1}:
 ${round.questions.map(q => `  - ${q.question} (Score: ${q.score}/10)`).join('\n')}
 `).join('\n')}
 
+DIFFICULTY GUIDELINES (VERY IMPORTANT):
+
+- Beginner:
+  * Basic definitions, simple concepts
+  * No deep system design
+  * Direct questions only
+  * Example: "What is middleware in Express?"
+
+- Intermediate:
+  * Application-based + some reasoning
+  * Small real-world scenarios
+  * Trade-offs, comparisons allowed
+  * Example: "When would you use caching in a REST API?"
+
+- Advanced:
+  * Deep system design / optimization / edge cases
+  * Requires multi-step thinking
+  * Real-world scalability challenges
+  * Example: "How would you design a distributed rate limiter?"
+
+STRICT RULE:
+→ The question MUST clearly match the difficulty level
+→ DO NOT generate same-level questions for all difficulties
+
 INSTRUCTIONS:
 1. Generate ONE technical question appropriate for round ${roundNumber} of ${interview.totalRounds}
 2. Tailor the question to the specified difficulty level: ${interview.difficulty || 'Intermediate'}
 3. Consider candidate's skills and past performance
 4. Avoid repeating previous questions
 5. Make it practical and role-specific
+2. Keep question length SHORT to MEDIUM:
+   - 8–20 words preferred
+   - Avoid long paragraph-style questions
+
+3. Maintain VARIETY across questions:
+   Choose ONE style:
+   - Direct concept question (e.g., "What is X?")
+   - Practical scenario (short, realistic)
+   - Comparison question (X vs Y)
+   - Debug/thinking question
+   - Trade-off question
+   -senario based
+
+4. Do NOT always generate scenario-based questions.
+   Mix styles naturally like a real interview.
+
+5. If previous question was long → make this shorter
+   If previous was direct → you can make this slightly practical
+
+6. Keep it conversational, like a human interviewer.
+
+7. Avoid repeating patterns like:
+   - "How would you design..."
+   - "Explain in detail..."
+
+8. Make it feel like a natural next question, not AI-generated.
 
 Generate only the question text.
 
@@ -239,7 +289,7 @@ QUESTION:
     const completion = await withRetry(async () => {
      
       return await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -251,7 +301,7 @@ QUESTION:
           }
         ],
         max_tokens: 150,
-        temperature: 0.8,
+        temperature: 0.5,
       });
     });
 
@@ -467,12 +517,38 @@ CANDIDATE BACKGROUND:
 - Role: ${interview.role}
 - Skills: ${userProfile.skills?.join(', ') || 'Not specified'}
 
-FOLLOW-UP STRATEGIES:
-- "deeper": Ask a more advanced, related question to test depth
-- "clarification": Ask them to clarify specific parts of their answer
-- "rephrase": Ask the same concept in a different way to check understanding
-- "alternative": Ask about different approaches or trade-offs
-- "corrective": Gently correct and ask if they want to try again
+FOLLOW-UP RULES (CRITICAL):
+
+1. Follow-up MUST be SHORT (max 12–18 words)
+
+2. It MUST directly react to the candidate’s answer:
+   - If wrong → point to mistake and ask again
+   - If partial → ask to complete missing part
+   - If good → go slightly deeper
+   - If vague → ask for clarification
+
+3. DO NOT ask generic questions like:
+   - "Can you explain more?"
+   - "Tell me more about that"
+
+4. Make it feel like a HUMAN interviewer:
+   - Slightly conversational
+   - Slightly challenging
+
+5. Match follow-up type:
+
+- deeper → push depth
+- clarification → target vague part
+- rephrase → same concept, simpler angle
+- alternative → ask another approach
+- corrective → hint mistake + retry
+
+EXAMPLES OF GOOD FOLLOW-UPS:
+
+- "You mentioned async — how does it actually work under the hood?"
+- "Why would that approach fail at scale?"
+- "What happens if the API call fails here?"
+- "You said state updates — what triggers re-render?"
 
 Generate ONE follow-up question that matches the requested type and feels natural in conversation.
 
@@ -483,7 +559,7 @@ FOLLOW-UP QUESTION:
   try { console.log('[LLM] generateFollowUpQuestion prompt preview (truncated 1200 chars):', prompt.slice(0, 1200)); } catch (e) { console.warn('LLM log preview failed', e); }
 
   const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -495,7 +571,7 @@ FOLLOW-UP QUESTION:
         }
       ],
       max_tokens: 120,
-      temperature: 0.7,
+      temperature: 0.5,
     });
 
   const followUpQuestion = completion.choices[0]?.message?.content?.trim();
@@ -612,7 +688,7 @@ Overall Assessment:
 `;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -681,20 +757,34 @@ REQUIREMENTS:
 OUTPUT FORMAT (as JSON):
 {
   "accuracy": "excellent|good|partial|incorrect|idk",
+  "score": 0-10,
   "answerSummary": "Brief summary of candidate's answer for report",
   "feedback": "Detailed technical feedback",
   "expectedAnswer": "Clear, simple expected answer in plain English",
   "keywords": ["keyword1", "keyword2", "keyword3", "keyword4"],
   "needsFollowUp": true|false,
-  "followUpType": "deeper|clarification|rephrase|alternative|none"
+"followUpType": "deeper|clarification|rephrase|alternative|corrective|none"
 }
+SCORING RULES (VERY IMPORTANT):
 
-CRITICAL SCORING RULE:
-- If the candidate answer is effectively "I don't know" (examples: "i don't know", "idk", "not sure", "no idea", empty/near-empty content), you MUST set:
-  - "accuracy": "idk"
-  - "needsFollowUp": false
-  - "followUpType": "none"
-- Do not classify such responses as partial/good/excellent.
+Give a score from 0 to 10 based on:
+
+- 0 → no answer / "idk" / irrelevant /completely wrong or useless
+- 1–2 → very weak,
+- 3–4 →  minimal understanding
+- 5–6 → basic understanding, but incomplete
+- 7–8 → good answer, mostly correct, some gaps
+- 9–10 → excellent, clear, complete, well-structured
+
+IMPORTANT:
+- VERY SHORT answers (1–3 words) should NEVER exceed 3/10
+- Answers like "I already told", "same as before" → MUST be 0
+- Penalize low effort answers heavily
+- Reward structured and detailed answers
+
+OUTPUT MUST INCLUDE:
+"score": number (0–10)
+
 
 IMPORTANT FOR EXPECTED ANSWER:
 - Use simple, clear language
@@ -703,11 +793,39 @@ IMPORTANT FOR EXPECTED ANSWER:
 - Focus on core concepts
 - Keep it practical and actionable
 
-KEYWORDS REQUIREMENTS:
-- 4-6 most important technical concepts
-- Relevant to the question and answer
-- Useful for quick revision
-- Specific and meaningful
+FOLLOW-UP DECISION RULES (CRITICAL):
+
+Decide if a follow-up question is needed based on answer quality:
+
+1. If accuracy = "idk":
+   → needsFollowUp = false
+   → followUpType = "none"
+
+2. If accuracy = "incorrect":
+   → needsFollowUp = true
+   → followUpType = "corrective"
+
+3. If accuracy = "partial":
+   → needsFollowUp = true
+   → followUpType = "clarification"
+
+4. If accuracy = "good":
+   → needsFollowUp = true
+   → followUpType = "deeper"
+
+5. If accuracy = "excellent":
+   → needsFollowUp = false (move forward like real interview)
+
+IMPORTANT:
+- Follow-up should feel like a natural continuation, not forced
+- Do NOT always generate follow-up
+- Real interviewers do NOT ask follow-up after every answer
+- Only ask when:
+  • answer is incomplete
+  • answer has mistake
+  • depth can be tested
+
+- If answer is strong → move to next question
 
 EXAMPLE:
 Question: "What is React?"
@@ -718,7 +836,7 @@ Generate honest but helpful feedback.
 `;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -730,15 +848,27 @@ Generate honest but helpful feedback.
         }
       ],
       max_tokens: 800,
-      temperature: 0.3,
+      temperature: 0.2,
       response_format: { type: "json_object" }
     });
 
-    const feedbackData = JSON.parse(completion.choices[0]?.message?.content?.trim());
+  const feedbackData = JSON.parse(
+      completion.choices[0]?.message?.content?.trim()
+    );
 
     if (!feedbackData) {
       throw new ApiError(500, "Failed to generate feedback");
     }
+
+    // ✅ LIGHT SAFETY (not hardcoding logic, just consistency)
+    if (
+      feedbackData.accuracy === "incorrect" ||
+      feedbackData.accuracy === "idk"
+    ) {
+      feedbackData.keywords = [];
+    }
+          console.log('Generated feedback data score:', feedbackData.score);
+
 
     return res
       .status(200)
@@ -750,7 +880,7 @@ Generate honest but helpful feedback.
         keywords: feedbackData.keywords || [], // Keywords for quick revision
         needsFollowUp: feedbackData.needsFollowUp,
         followUpType: feedbackData.followUpType,
-        score: calculateScoreFromAccuracy(feedbackData.accuracy)
+        score: feedbackData.score  ,         
       }, "Feedback generated successfully"));
 
   } catch (error) {
@@ -771,17 +901,3 @@ Generate honest but helpful feedback.
       }, "Used fallback feedback"));
   }
 });
-
-
-
-// Helper function to calculate score from accuracy
-const calculateScoreFromAccuracy = (accuracy) => {
-  const scoreMap = {
-    "excellent": 9,
-    "good": 7,
-    "partial": 5,
-    "incorrect": 2,
-    "idk": 0
-  };
-  return scoreMap[accuracy] || 5;
-};
